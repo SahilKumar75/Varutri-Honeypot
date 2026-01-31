@@ -1,29 +1,52 @@
-# Varutri Honeypot 🛡️
+# Varutri Honeypot
 
-**Agentic Honeypot System for India AI Impact Buildathon**
+Agentic Honeypot System for India AI Impact Buildathon
 
-An intelligent honeypot that engages with scammers using Ollama LLM (Llama 3), extracts threat intelligence, and reports findings to the GUVI Hackathon API.
+## Overview
 
-## 🎯 Project Overview
+An AI-powered honeypot that engages scammers in realistic conversations, extracts threat intelligence (UPI IDs, bank accounts, phishing URLs), and reports findings to the GUVI Hackathon API.
 
-Varutri is an AI-powered honeypot designed to:
-- Engage scammers in realistic conversations using persona-driven AI
-- Extract critical intelligence: UPI IDs, bank accounts, phishing URLs
-- Provide real-time threat intelligence to security teams
-- Meet strict buildathon requirements for API integration
+## Tech Stack
 
-## 🏗️ Architecture
+- Spring Boot 3.2.2 (Java 17)
+- LLM: Hugging Face API (Llama 3.2) or Ollama (local)
+- Security: Spring Security with API key validation
+- Intelligence: Regex-based pattern extraction
+- Build: Maven
 
-- **Backend**: Spring Boot 3.2.2 (Java 17)
-- **AI Engine**: Ollama with Llama 3 (8B)
-- **Security**: API Key authentication
-- **Intelligence**: Regex-based pattern extraction
-- **Reporting**: REST callback to GUVI API
+## Quick Start
 
-## 📋 API Endpoints
+### Prerequisites
 
-### POST `/api/chat`
-Engage with the honeypot system.
+- Java 17+
+- Maven
+- Hugging Face API key (get from https://huggingface.co/settings/tokens)
+
+### Setup
+
+1. Clone repository
+```bash
+git clone https://github.com/SahilKumar75/Varutri-Honeypot.git
+cd Varutri-Honeypot
+```
+
+2. Configure API key in `src/main/resources/application.properties`
+```properties
+llm.provider=huggingface
+huggingface.api-key=YOUR_API_KEY_HERE
+```
+
+3. Build and run
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+Application starts on `http://localhost:8080`
+
+## API Endpoints
+
+### POST /api/chat
 
 **Headers:**
 ```
@@ -31,166 +54,55 @@ x-api-key: varutri_shield_2026
 Content-Type: application/json
 ```
 
-- **LLM Integration**:
-  - **Option 1**: Ollama (Llama 3) - Local inference
-  - **Option 2**: Hugging Face API - Cloud inference (recommended for buildathon)
-- **Security**: Spring Security with API key validation
-- **HTTP Client**: WebClient (Spring WebFlux)
-- **Intelligence Extraction**: Java Regex patterns
-- **Session Management**: In-memory ConcurrentHashMap
-- **Build Tool**: Maven
+**Request:**
+```json
+{
+  "sessionId": "session-id",
+  "message": "user message",
+  "conversationHistory": []
+}
+```
 
-## 🚀 Quick Start
+**Response:**
+```json
+{
+  "status": "success",
+  "reply": "AI response"
+}
+```
 
-### Prerequisites
+### GET /health
 
-1. **Java 17+** installed
-2. **Maven** installed
-3. **Choose your LLM provider**:
-   - **Hugging Face** (Recommended): Get free API key from https://huggingface.co/settings/tokens
-   - **Ollama**: Install from https://ollama.ai
+Health check endpoint
 
-### Setup
+## Intelligence Extraction
 
-1. **Clone the repository**
+Automatically detects:
+- UPI IDs: `user@paytm`, `9876543210@ybl`
+- Bank accounts with IFSC codes
+- Phishing URLs
+
+## Deployment
+
+Use ngrok for public access:
 ```bash
-git clone https://github.com/SahilKumar75/Varutri-Honeypot.git
-cd Varutri-Honeypot
-```
-
-2. **Configure LLM Provider**
-
-Edit `src/main/resources/application.properties`:
-
-**For Hugging Face** (No local installation needed):
-```properties
-llm.provider=huggingface
-huggingface.api-key=hf_YOUR_TOKEN_HERE
-```
-See [HUGGINGFACE_SETUP.md](HUGGINGFACE_SETUP.md) for detailed instructions.
-
-**For Ollama** (Local installation):
-```properties
-llm.provider=ollama
-```
-Then run:
-```bash
-ollama serve
-ollama pull llama3
-```
-
-### Verify Ollama is Running
-```bash
-curl -X POST http://localhost:11434/api/generate \
-  -H "Content-Type: application/json" \
-  -d '{"model":"llama3","prompt":"Hello","stream":false}'
-```
-
-### Run the Application
-```bash
-# Clone the repository
-git clone https://github.com/SahilKumar75/Varutri-Honeypot.git
-cd Varutri-Honeypot
-
-# Build the project
-mvn clean install
-
-# Run the application
-mvn spring-boot:run
-```
-
-The application will start on `http://localhost:8080`
-
-## 🧪 Testing
-
-### Test with cURL
-```bash
-curl -X POST http://localhost:8080/api/chat \
-  -H "x-api-key: varutri_shield_2026" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionId": "test-session-1",
-    "message": "Hi, I have an offer for you",
-    "conversationHistory": []
-  }'
-```
-
-### Run Unit Tests
-```bash
-mvn test
-```
-
-## 🌐 Public Deployment (ngrok)
-
-For buildathon integration with GUVI Mock Scammer API:
-
-```bash
-# Install ngrok
-brew install ngrok
-
-# Create public tunnel
 ngrok http 8080
-
-# Use the generated https URL for the hackathon
 ```
 
-## 🔍 Intelligence Extraction
+## Configuration
 
-Varutri automatically detects and extracts:
+Key settings in `application.properties`:
+- `llm.provider`: `huggingface` or `ollama`
+- `huggingface.api-key`: Your HF API key
+- `varutri.api-key`: API key for requests (default: `varutri_shield_2026`)
+- `hackathon.callback-url`: GUVI callback endpoint
+- `varutri.session.max-turns`: Max conversation turns (default: 20)
 
-| Pattern | Regex | Example |
-|---------|-------|---------|
-| **UPI ID** | `[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}` | `user@paytm`, `9876543210@ybl` |
-| **Bank Account** | Custom patterns | Account numbers with IFSC codes |
-| **Phishing URLs** | `https?://[^\s]+` | Suspicious links |
+## Team
 
-## 👥 Team
+- Lead Developer: SahilKumar75
+- Teammate: TBD
 
-- **Lead Developer**: [SahilKumar75](https://github.com/SahilKumar75)
-- **Teammate**: _(To be added)_
-
-## 🏆 Buildathon Success Metrics
-
-1. **Engagement Duration**: Multi-turn conversations with scammers
-2. **Intelligence Quality**: Successfully extracted UPI IDs, accounts, URLs
-3. **System Stability**: Low latency (< 2s), 99% uptime
-4. **API Compliance**: 100% adherence to GUVI API specifications
-
-## 📝 Configuration
-
-Edit `src/main/resources/application.properties`:
-
-```properties
-# Server Configuration
-server.port=8080
-
-# Ollama Configuration
-ollama.base-url=http://localhost:11434
-ollama.model=llama3
-
-# Security
-varutri.api-key=varutri_shield_2026
-
-# Hackathon Callback
-hackathon.callback-url=https://hackathon.guvi.in/api/updateHoneyPotFinalResult
-
-# Logging
-logging.level.com.varutri=DEBUG
-```
-
-## 🔒 Security Notes
-
-- API key validation required for all requests
-- Sessions tracked in-memory (consider Redis for production)
-- Sensitive data sanitized before logging
-- Final callback only triggered after session completion
-
-## 📄 License
+## License
 
 Built for India AI Impact Buildathon 2026
-
----
-
-**Project Status**: 🚧 Active Development
-
-**Last Updated**: January 31, 2026

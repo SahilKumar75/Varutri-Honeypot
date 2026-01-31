@@ -28,10 +28,10 @@ public class HuggingFaceService {
 
     public HuggingFaceService(
             @Value("${huggingface.api-key}") String apiKey,
-            @Value("${huggingface.model:meta-llama/Llama-3.2-3B-Instruct}") String model) {
+            @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model) {
         this.model = model;
         this.webClient = WebClient.builder()
-                .baseUrl("https://api-inference.huggingface.co/models/" + model)
+                .baseUrl("https://router.huggingface.co/models/" + model)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .build();
 
