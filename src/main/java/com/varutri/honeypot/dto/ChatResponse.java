@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
  * Outgoing response to the scammer/client
  */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatResponse {
