@@ -120,7 +120,7 @@ Key settings in `application.properties`:
 ## Team
 
 - Lead Developer: SahilKumar75
-- Teammate: TBD
+- Teammate: manurana26770
 
 ## License
 
