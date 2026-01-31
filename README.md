@@ -18,12 +18,12 @@ An AI-powered honeypot system that engages scammers in realistic conversations u
 
 ### Key Features
 
-✅ **Agentic AI Engagement** - LLM-powered realistic persona (Rajesh Kumar, 67-year-old retired teacher)  
-✅ **Intelligence Extraction** - Automatic extraction of UPI IDs, bank details, phone numbers, URLs  
-✅ **Scam Detection** - Pattern-based detection of investment, lottery, phishing, and job scams  
-✅ **Threat Assessment** - Real-time threat level calculation (0.0-1.0)  
-✅ **Evidence Collection** - Structured storage of conversations and extracted intelligence  
-✅ **API Integration** - RESTful API for external systems and law enforcement
+**Agentic AI Engagement** - LLM-powered realistic persona (Rajesh Kumar, 67-year-old retired teacher)  
+**Intelligence Extraction** - Automatic extraction of UPI IDs, bank details, phone numbers, URLs  
+**Scam Detection** - Pattern-based detection of investment, lottery, phishing, and job scams  
+**Threat Assessment** - Real-time threat level calculation (0.0-1.0)  
+**Evidence Collection** - Structured storage of conversations and extracted intelligence  
+**API Integration** - RESTful API for external systems and law enforcement
 
 ## Tech Stack
 
