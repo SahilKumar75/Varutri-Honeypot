@@ -31,41 +31,34 @@ public class HuggingFaceService {
             @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model) {
         this.model = model;
         this.webClient = WebClient.builder()
-                .baseUrl("https://router.huggingface.co/models/" + model)
+                .baseUrl("https://router.huggingface.co/v1")
                 .defaultHeader("Authorization", "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
                 .build();
 
         log.info("Hugging Face service initialized with model: {}", model);
     }
 
     /**
-     * Generate response using Hugging Face
+     * Generate response using Hugging Face Chat Completions API
      */
     public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
         try {
-            String prompt = buildPrompt(userMessage, conversationHistory);
+            ChatCompletionRequest request = buildChatRequest(userMessage, conversationHistory);
 
-            HuggingFaceRequest request = new HuggingFaceRequest();
-            request.setInputs(prompt);
-            request.setParameters(new HuggingFaceRequest.Parameters(200, 0.7, 0.9, 50));
+            log.debug("Sending chat completion request to Hugging Face");
 
-            log.debug("Sending request to Hugging Face with prompt length: {}", prompt.length());
-
-            Mono<List<HuggingFaceResponse>> responseMono = webClient.post()
+            Mono<ChatCompletionResponse> responseMono = webClient.post()
+                    .uri("/chat/completions")
                     .bodyValue(request)
                     .retrieve()
-                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<List<HuggingFaceResponse>>() {
-                    })
+                    .bodyToMono(ChatCompletionResponse.class)
                     .timeout(Duration.ofSeconds(30));
 
-            List<HuggingFaceResponse> responses = responseMono.block();
+            ChatCompletionResponse response = responseMono.block();
 
-            if (responses != null && !responses.isEmpty() && responses.get(0).getGeneratedText() != null) {
-                String reply = responses.get(0).getGeneratedText().trim();
-                // Remove the prompt from the response (HF returns prompt + completion)
-                if (reply.startsWith(prompt)) {
-                    reply = reply.substring(prompt.length()).trim();
-                }
+            if (response != null && response.getChoices() != null && !response.getChoices().isEmpty()) {
+                String reply = response.getChoices().get(0).getMessage().getContent().trim();
                 log.info("Received response from Hugging Face (length: {})", reply.length());
                 return reply;
             } else {
@@ -80,29 +73,41 @@ public class HuggingFaceService {
     }
 
     /**
-     * Build prompt with persona and conversation context
+     * Build chat completion request with messages
      */
-    private String buildPrompt(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
-        StringBuilder prompt = new StringBuilder();
+    private ChatCompletionRequest buildChatRequest(String userMessage,
+            List<ChatRequest.ConversationMessage> conversationHistory) {
+        ChatCompletionRequest request = new ChatCompletionRequest();
+        request.setModel(model);
+        request.setMaxTokens(200);
+        request.setTemperature(0.7);
 
-        // System persona
-        prompt.append(getSystemPersona()).append("\n\n");
+        List<Message> messages = new java.util.ArrayList<>();
 
-        // Conversation history
+        // System message with persona
+        Message systemMsg = new Message();
+        systemMsg.setRole("system");
+        systemMsg.setContent(getSystemPersona());
+        messages.add(systemMsg);
+
+        // Add conversation history
         if (conversationHistory != null && !conversationHistory.isEmpty()) {
-            prompt.append("Previous conversation:\n");
             for (ChatRequest.ConversationMessage msg : conversationHistory) {
-                String role = "user".equals(msg.getRole()) ? "Them" : "You";
-                prompt.append(role).append(": ").append(msg.getContent()).append("\n");
+                Message historyMsg = new Message();
+                historyMsg.setRole(msg.getRole());
+                historyMsg.setContent(msg.getContent());
+                messages.add(historyMsg);
             }
-            prompt.append("\n");
         }
 
-        // Current message
-        prompt.append("Them: ").append(userMessage).append("\n");
-        prompt.append("You: ");
+        // Add current user message
+        Message userMsg = new Message();
+        userMsg.setRole("user");
+        userMsg.setContent(userMessage);
+        messages.add(userMsg);
 
-        return prompt.toString();
+        request.setMessages(messages);
+        return request;
     }
 
     /**
@@ -141,39 +146,48 @@ public class HuggingFaceService {
                 """;
     }
 
+    // Chat Completions API Request/Response classes
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class HuggingFaceRequest {
-        @JsonProperty("inputs")
-        private String inputs;
+    public static class ChatCompletionRequest {
+        @JsonProperty("model")
+        private String model;
 
-        @JsonProperty("parameters")
-        private Parameters parameters;
+        @JsonProperty("messages")
+        private List<Message> messages;
 
-        @Data
-        @NoArgsConstructor
-        @AllArgsConstructor
-        public static class Parameters {
-            @JsonProperty("max_new_tokens")
-            private int maxNewTokens;
+        @JsonProperty("max_tokens")
+        private Integer maxTokens;
 
-            @JsonProperty("temperature")
-            private double temperature;
-
-            @JsonProperty("top_p")
-            private double topP;
-
-            @JsonProperty("top_k")
-            private int topK;
-        }
+        @JsonProperty("temperature")
+        private Double temperature;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class HuggingFaceResponse {
-        @JsonProperty("generated_text")
-        private String generatedText;
+    public static class Message {
+        @JsonProperty("role")
+        private String role;
+
+        @JsonProperty("content")
+        private String content;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ChatCompletionResponse {
+        @JsonProperty("choices")
+        private List<Choice> choices;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Choice {
+        @JsonProperty("message")
+        private Message message;
     }
 }
