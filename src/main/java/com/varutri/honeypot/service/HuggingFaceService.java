@@ -1,8 +1,10 @@
 package com.varutri.honeypot.service;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.varutri.honeypot.dto.ChatRequest;
-import com.varutri.honeypot.dto.OllamaRequest;
-import com.varutri.honeypot.dto.OllamaResponse;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,63 +16,65 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Service for communicating with Ollama LLM
+ * Service for communicating with Hugging Face Inference API
  */
 @Slf4j
 @Service
-@ConditionalOnProperty(name = "llm.provider", havingValue = "ollama", matchIfMissing = true)
-public class OllamaService {
+@ConditionalOnProperty(name = "llm.provider", havingValue = "huggingface")
+public class HuggingFaceService {
 
     private final WebClient webClient;
     private final String model;
 
-    public OllamaService(
-            @Value("${ollama.base-url}") String baseUrl,
-            @Value("${ollama.model}") String model,
-            @Value("${ollama.timeout:30}") int timeout) {
+    public HuggingFaceService(
+            @Value("${huggingface.api-key}") String apiKey,
+            @Value("${huggingface.model:meta-llama/Llama-3.2-3B-Instruct}") String model) {
         this.model = model;
         this.webClient = WebClient.builder()
-                .baseUrl(baseUrl != null ? baseUrl : "http://localhost:11434")
+                .baseUrl("https://api-inference.huggingface.co/models/" + model)
+                .defaultHeader("Authorization", "Bearer " + apiKey)
                 .build();
 
-        log.info("Ollama service initialized with model: {} at {}", model, baseUrl);
+        log.info("Hugging Face service initialized with model: {}", model);
     }
 
     /**
-     * Generate response using Ollama
+     * Generate response using Hugging Face
      */
     public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
         try {
             String prompt = buildPrompt(userMessage, conversationHistory);
 
-            OllamaRequest request = new OllamaRequest();
-            request.setModel(model);
-            request.setPrompt(prompt);
-            request.setStream(false);
-            request.setOptions(new OllamaRequest.OllamaOptions());
+            HuggingFaceRequest request = new HuggingFaceRequest();
+            request.setInputs(prompt);
+            request.setParameters(new HuggingFaceRequest.Parameters(200, 0.7, 0.9, 50));
 
-            log.debug("Sending request to Ollama with prompt length: {}", prompt.length());
+            log.debug("Sending request to Hugging Face with prompt length: {}", prompt.length());
 
-            Mono<OllamaResponse> responseMono = webClient.post()
-                    .uri("/api/generate")
+            Mono<List<HuggingFaceResponse>> responseMono = webClient.post()
                     .bodyValue(request)
                     .retrieve()
-                    .bodyToMono(OllamaResponse.class)
+                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<List<HuggingFaceResponse>>() {
+                    })
                     .timeout(Duration.ofSeconds(30));
 
-            OllamaResponse response = responseMono.block();
+            List<HuggingFaceResponse> responses = responseMono.block();
 
-            if (response != null && response.getResponse() != null) {
-                String reply = response.getResponse().trim();
-                log.info("Received response from Ollama (length: {})", reply.length());
+            if (responses != null && !responses.isEmpty() && responses.get(0).getGeneratedText() != null) {
+                String reply = responses.get(0).getGeneratedText().trim();
+                // Remove the prompt from the response (HF returns prompt + completion)
+                if (reply.startsWith(prompt)) {
+                    reply = reply.substring(prompt.length()).trim();
+                }
+                log.info("Received response from Hugging Face (length: {})", reply.length());
                 return reply;
             } else {
-                log.error("Received null or empty response from Ollama");
+                log.error("Received null or empty response from Hugging Face");
                 return "I'm having trouble understanding. Could you please repeat that?";
             }
 
         } catch (Exception e) {
-            log.error("Error calling Ollama API: {}", e.getMessage(), e);
+            log.error("Error calling Hugging Face API: {}", e.getMessage(), e);
             return "I'm experiencing some technical difficulties. Please try again.";
         }
     }
@@ -135,5 +139,41 @@ public class OllamaService {
 
                 Your goal is to keep the conversation going naturally while appearing as a real person.
                 """;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class HuggingFaceRequest {
+        @JsonProperty("inputs")
+        private String inputs;
+
+        @JsonProperty("parameters")
+        private Parameters parameters;
+
+        @Data
+        @NoArgsConstructor
+        @AllArgsConstructor
+        public static class Parameters {
+            @JsonProperty("max_new_tokens")
+            private int maxNewTokens;
+
+            @JsonProperty("temperature")
+            private double temperature;
+
+            @JsonProperty("top_p")
+            private double topP;
+
+            @JsonProperty("top_k")
+            private int topK;
+        }
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class HuggingFaceResponse {
+        @JsonProperty("generated_text")
+        private String generatedText;
     }
 }

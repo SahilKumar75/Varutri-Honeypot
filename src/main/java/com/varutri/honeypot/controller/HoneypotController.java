@@ -3,12 +3,13 @@ package com.varutri.honeypot.controller;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.service.CallbackService;
+import com.varutri.honeypot.service.HuggingFaceService;
 import com.varutri.honeypot.service.IntelligenceExtractor;
 import com.varutri.honeypot.service.OllamaService;
 import com.varutri.honeypot.service.SessionStore;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,13 +22,22 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/api")
-@RequiredArgsConstructor
 public class HoneypotController {
 
-    private final OllamaService ollamaService;
-    private final SessionStore sessionStore;
-    private final IntelligenceExtractor intelligenceExtractor;
-    private final CallbackService callbackService;
+    @Autowired(required = false)
+    private OllamaService ollamaService;
+
+    @Autowired(required = false)
+    private HuggingFaceService huggingFaceService;
+
+    @Autowired
+    private SessionStore sessionStore;
+
+    @Autowired
+    private IntelligenceExtractor intelligenceExtractor;
+
+    @Autowired
+    private CallbackService callbackService;
 
     @Value("${varutri.session.max-turns:20}")
     private int maxTurns;
@@ -52,8 +62,8 @@ public class HoneypotController {
             List<ChatRequest.ConversationMessage> conversationHistory = mergeConversationHistory(sessionId,
                     request.getConversationHistory());
 
-            // Generate AI response using Ollama
-            String aiResponse = ollamaService.generateResponse(userMessage, conversationHistory);
+            // Generate AI response using configured LLM provider
+            String aiResponse = generateResponse(userMessage, conversationHistory);
 
             // Update session with AI response
             sessionStore.addMessage(sessionId, "assistant", aiResponse);
@@ -105,6 +115,20 @@ public class HoneypotController {
             return requestHistory;
         }
         return sessionStore.getConversationHistory(sessionId);
+    }
+
+    /**
+     * Generate response using configured LLM provider
+     */
+    private String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
+        if (huggingFaceService != null) {
+            return huggingFaceService.generateResponse(userMessage, conversationHistory);
+        } else if (ollamaService != null) {
+            return ollamaService.generateResponse(userMessage, conversationHistory);
+        } else {
+            throw new IllegalStateException(
+                    "No LLM service configured. Please set llm.provider to 'ollama' or 'huggingface'");
+        }
     }
 
     /**
