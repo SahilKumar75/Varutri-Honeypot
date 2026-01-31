@@ -31,42 +31,51 @@ x-api-key: varutri_shield_2026
 Content-Type: application/json
 ```
 
-**Request Body:**
-```json
-{
-  "sessionId": "unique-session-identifier",
-  "message": "User message here",
-  "conversationHistory": [
-    {"role": "user", "content": "Previous message"},
-    {"role": "assistant", "content": "Previous response"}
-  ]
-}
-```
+- **LLM Integration**:
+  - **Option 1**: Ollama (Llama 3) - Local inference
+  - **Option 2**: Hugging Face API - Cloud inference (recommended for buildathon)
+- **Security**: Spring Security with API key validation
+- **HTTP Client**: WebClient (Spring WebFlux)
+- **Intelligence Extraction**: Java Regex patterns
+- **Session Management**: In-memory ConcurrentHashMap
+- **Build Tool**: Maven
 
-**Response:**
-```json
-{
-  "status": "success",
-  "reply": "AI-generated response"
-}
-```
-
-## 🚀 Setup Instructions
+## 🚀 Quick Start
 
 ### Prerequisites
+
 1. **Java 17+** installed
-2. **Maven 3.6+** installed
-3. **Ollama** running locally with Llama 3
+2. **Maven** installed
+3. **Choose your LLM provider**:
+   - **Hugging Face** (Recommended): Get free API key from https://huggingface.co/settings/tokens
+   - **Ollama**: Install from https://ollama.ai
 
-### Install Ollama (if not already installed)
+### Setup
+
+1. **Clone the repository**
 ```bash
-# macOS
-brew install ollama
+git clone https://github.com/SahilKumar75/Varutri-Honeypot.git
+cd Varutri-Honeypot
+```
 
-# Start Ollama service
+2. **Configure LLM Provider**
+
+Edit `src/main/resources/application.properties`:
+
+**For Hugging Face** (No local installation needed):
+```properties
+llm.provider=huggingface
+huggingface.api-key=hf_YOUR_TOKEN_HERE
+```
+See [HUGGINGFACE_SETUP.md](HUGGINGFACE_SETUP.md) for detailed instructions.
+
+**For Ollama** (Local installation):
+```properties
+llm.provider=ollama
+```
+Then run:
+```bash
 ollama serve
-
-# Pull Llama 3 model
 ollama pull llama3
 ```
 
