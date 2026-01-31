@@ -31,9 +31,6 @@ public class HoneypotController {
     private SessionStore sessionStore;
 
     @Autowired
-    private IntelligenceExtractor intelligenceExtractor;
-
-    @Autowired
     private CallbackService callbackService;
 
     @Autowired
@@ -55,10 +52,14 @@ public class HoneypotController {
     @PostMapping("/chat")
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
         String sessionId = request.getSessionId();
-        String userMessage = request.getMessage();
 
-        log.info("📩 Received message for session {}: {}", sessionId,
-                userMessage.length() > 50 ? userMessage.substring(0, 50) + "..." : userMessage);
+        // Extract text from nested message object (GUVI format)
+        String userMessage = request.getMessage().getText();
+        String sender = request.getMessage().getSender();
+
+        log.info("Received message for session {}: {} from {}", sessionId,
+                userMessage.length() > 50 ? userMessage.substring(0, 50) + "..." : userMessage,
+                sender);
 
         try {
             // Extract intelligence from user message
@@ -153,27 +154,29 @@ public class HoneypotController {
     }
 
     /**
-     * Send final callback with extracted intelligence
+     * Send final callback with extracted intelligence to GUVI
      */
     private void sendFinalCallback(String sessionId) {
         try {
-            // Get all messages from session
-            List<String> allMessages = sessionStore.getAllMessages(sessionId);
+            // Get evidence package
+            EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
 
-            // Extract intelligence
-            IntelligenceExtractor.IntelligenceData intelligence = intelligenceExtractor
-                    .extractAllIntelligence(allMessages);
+            if (evidence != null) {
+                // Generate agent notes
+                String agentNotes = String.format("Scam type: %s, Threat level: %.2f, Engagement successful",
+                        evidence.getScamType(), evidence.getThreatLevel());
 
-            // Get turn count
-            int turnCount = sessionStore.getTurnCount(sessionId);
+                // Send to GUVI
+                callbackService.sendFinalReport(
+                        sessionId,
+                        evidence.getExtractedInfo(),
+                        evidence.getConversation().size(),
+                        agentNotes);
 
-            // Send callback
-            callbackService.sendFinalReport(
-                    sessionId,
-                    intelligence.upiIds(),
-                    intelligence.bankAccounts(),
-                    intelligence.phishingUrls(),
-                    turnCount);
+                log.info("Final callback sent to GUVI for session {}", sessionId);
+            } else {
+                log.warn("No evidence found for session {}, skipping callback", sessionId);
+            }
 
             // Clear session after callback
             sessionStore.clearSession(sessionId);

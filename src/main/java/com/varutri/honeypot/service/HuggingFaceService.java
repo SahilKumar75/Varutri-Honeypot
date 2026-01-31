@@ -94,8 +94,8 @@ public class HuggingFaceService {
         if (conversationHistory != null && !conversationHistory.isEmpty()) {
             for (ChatRequest.ConversationMessage msg : conversationHistory) {
                 Message historyMsg = new Message();
-                historyMsg.setRole(msg.getRole());
-                historyMsg.setContent(msg.getContent());
+                historyMsg.setRole(msg.getSender());
+                historyMsg.setContent(msg.getText());
                 messages.add(historyMsg);
             }
         }

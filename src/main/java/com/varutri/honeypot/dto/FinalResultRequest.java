@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Final result request to send to GUVI Hackathon API
+ * Final result payload for GUVI Hackathon callback
+ * POST https://hackathon.guvi.in/api/updateHoneyPotFinalResult
  */
 @Data
 @Builder
@@ -20,33 +21,36 @@ public class FinalResultRequest {
     @JsonProperty("sessionId")
     private String sessionId;
 
-    @JsonProperty("teamId")
-    private String teamId;
+    @JsonProperty("scamDetected")
+    private boolean scamDetected;
 
-    @JsonProperty("upiIds")
-    private List<String> upiIds;
+    @JsonProperty("totalMessagesExchanged")
+    private int totalMessagesExchanged;
 
-    @JsonProperty("bankAccounts")
-    private List<BankAccountInfo> bankAccounts;
+    @JsonProperty("extractedIntelligence")
+    private ExtractedIntelligence extractedIntelligence;
 
-    @JsonProperty("phishingLinks")
-    private List<String> phishingLinks;
-
-    @JsonProperty("conversationTurns")
-    private Integer conversationTurns;
-
-    @JsonProperty("timestamp")
-    private String timestamp;
+    @JsonProperty("agentNotes")
+    private String agentNotes;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class BankAccountInfo {
-        @JsonProperty("accountNumber")
-        private String accountNumber;
+    public static class ExtractedIntelligence {
+        @JsonProperty("bankAccounts")
+        private List<String> bankAccounts;
 
-        @JsonProperty("ifscCode")
-        private String ifscCode;
+        @JsonProperty("upiIds")
+        private List<String> upiIds;
+
+        @JsonProperty("phishingLinks")
+        private List<String> phishingLinks;
+
+        @JsonProperty("phoneNumbers")
+        private List<String> phoneNumbers;
+
+        @JsonProperty("suspiciousKeywords")
+        private List<String> suspiciousKeywords;
     }
 }

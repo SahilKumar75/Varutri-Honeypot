@@ -88,8 +88,8 @@ public class OllamaService {
         if (conversationHistory != null && !conversationHistory.isEmpty()) {
             prompt.append("Previous conversation:\n");
             for (ChatRequest.ConversationMessage msg : conversationHistory) {
-                String role = "user".equals(msg.getRole()) ? "Them" : "You";
-                prompt.append(role).append(": ").append(msg.getContent()).append("\n");
+                String role = "user".equals(msg.getSender()) ? "Them" : "You";
+                prompt.append(role).append(": ").append(msg.getText()).append("\n");
             }
             prompt.append("\n");
         }

@@ -10,7 +10,8 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 
 /**
- * Incoming chat request from the scammer/client
+ * Incoming chat request from GUVI Hackathon platform
+ * Matches official problem statement format
  */
 @Data
 @NoArgsConstructor
@@ -21,22 +22,64 @@ public class ChatRequest {
     @JsonProperty("sessionId")
     private String sessionId;
 
-    @NotBlank(message = "Message is required")
+    @NotNull(message = "Message is required")
     @JsonProperty("message")
-    private String message;
+    private Message message;
 
-    @NotNull(message = "Conversation history is required")
     @JsonProperty("conversationHistory")
     private List<ConversationMessage> conversationHistory;
 
+    @JsonProperty("metadata")
+    private Metadata metadata;
+
+    /**
+     * Message object as per GUVI format
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Message {
+        @JsonProperty("sender")
+        private String sender; // "scammer" or "user"
+
+        @JsonProperty("text")
+        private String text;
+
+        @JsonProperty("timestamp")
+        private String timestamp; // ISO-8601 format
+    }
+
+    /**
+     * Conversation history message format
+     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
     public static class ConversationMessage {
-        @JsonProperty("role")
-        private String role; // "user" or "assistant"
+        @JsonProperty("sender")
+        private String sender; // "scammer" or "user"
 
-        @JsonProperty("content")
-        private String content;
+        @JsonProperty("text")
+        private String text;
+
+        @JsonProperty("timestamp")
+        private String timestamp;
+    }
+
+    /**
+     * Optional metadata
+     */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Metadata {
+        @JsonProperty("channel")
+        private String channel; // SMS / WhatsApp / Email / Chat
+
+        @JsonProperty("language")
+        private String language;
+
+        @JsonProperty("locale")
+        private String locale;
     }
 }

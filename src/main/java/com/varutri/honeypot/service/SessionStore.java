@@ -73,7 +73,7 @@ public class SessionStore {
      */
     public List<String> getAllMessages(String sessionId) {
         return getOrCreateSession(sessionId).getConversationHistory().stream()
-                .map(ChatRequest.ConversationMessage::getContent)
+                .map(ChatRequest.ConversationMessage::getText)
                 .toList();
     }
 
@@ -90,9 +90,10 @@ public class SessionStore {
             this.turnCount = 0;
         }
 
-        public void addMessage(String role, String content) {
-            conversationHistory.add(new ChatRequest.ConversationMessage(role, content));
-            if ("user".equals(role)) {
+        public void addMessage(String sender, String text) {
+            conversationHistory
+                    .add(new ChatRequest.ConversationMessage(sender, text, java.time.Instant.now().toString()));
+            if ("scammer".equals(sender)) {
                 turnCount++;
             }
         }
