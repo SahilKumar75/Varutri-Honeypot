@@ -2,11 +2,8 @@ package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
-import com.varutri.honeypot.service.CallbackService;
-import com.varutri.honeypot.service.HuggingFaceService;
-import com.varutri.honeypot.service.IntelligenceExtractor;
-import com.varutri.honeypot.service.OllamaService;
-import com.varutri.honeypot.service.SessionStore;
+import com.varutri.honeypot.dto.ExtractedInfo;
+import com.varutri.honeypot.service.*;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +36,15 @@ public class HoneypotController {
     @Autowired
     private CallbackService callbackService;
 
+    @Autowired
+    private InformationExtractor informationExtractor;
+
+    @Autowired
+    private ScamDetector scamDetector;
+
+    @Autowired
+    private EvidenceCollector evidenceCollector;
+
     @Value("${varutri.session.max-turns:20}")
     private int maxTurns;
 
@@ -55,6 +61,18 @@ public class HoneypotController {
                 userMessage.length() > 50 ? userMessage.substring(0, 50) + "..." : userMessage);
 
         try {
+            // Extract intelligence from user message
+            ExtractedInfo extracted = informationExtractor.extractInformation(userMessage);
+
+            // Detect scam type and threat level
+            String scamType = scamDetector.detectScamType(userMessage);
+            double threatLevel = scamDetector.calculateThreatLevel(userMessage);
+
+            if (threatLevel >= 0.6) {
+                log.warn("🚨 HIGH THREAT DETECTED! Session: {}, Type: {}, Level: {}",
+                        sessionId, scamType, String.format("%.2f", threatLevel));
+            }
+
             // Update session with incoming message
             sessionStore.addMessage(sessionId, "user", userMessage);
 
@@ -67,6 +85,9 @@ public class HoneypotController {
 
             // Update session with AI response
             sessionStore.addMessage(sessionId, "assistant", aiResponse);
+
+            // Collect evidence for this conversation turn
+            evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
 
             // Check if we should trigger final callback
             int turnCount = sessionStore.getTurnCount(sessionId);
@@ -160,5 +181,45 @@ public class HoneypotController {
         } catch (Exception e) {
             log.error("Error sending final callback for session {}: {}", sessionId, e.getMessage(), e);
         }
+    }
+
+    /**
+     * Get evidence for a specific session
+     * GET /api/evidence/{sessionId}
+     */
+    @GetMapping("/evidence/{sessionId}")
+    public ResponseEntity<?> getEvidence(@PathVariable String sessionId) {
+        log.info("📊 Evidence requested for session: {}", sessionId);
+
+        EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
+
+        if (evidence == null) {
+            return ResponseEntity.status(404)
+                    .body("{\"error\":\"No evidence found for session: " + sessionId + "\"}");
+        }
+
+        return ResponseEntity.ok(evidence);
+    }
+
+    /**
+     * Get all high-threat evidence packages
+     * GET /api/evidence/high-threat
+     */
+    @GetMapping("/evidence/high-threat")
+    public ResponseEntity<?> getHighThreatEvidence() {
+        log.info("🚨 High-threat evidence requested");
+        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getHighThreatEvidence();
+        return ResponseEntity.ok(evidence);
+    }
+
+    /**
+     * Get all evidence packages
+     * GET /api/evidence
+     */
+    @GetMapping("/evidence")
+    public ResponseEntity<?> getAllEvidence() {
+        log.info("📊 All evidence requested");
+        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getAllEvidence();
+        return ResponseEntity.ok(evidence);
     }
 }

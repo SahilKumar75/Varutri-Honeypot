@@ -1,18 +1,37 @@
 # Varutri Honeypot
 
-Agentic Honeypot System for India AI Impact Buildathon
+**India AI Impact Buildathon - Problem 2: Agentic Honey-Pot**
+
+## Team Information
+
+**Team Name:** AITians
+
+**Team Members:**
+- **Sahil Kumar Singh** (Team Leader) - sahilkumargreat12@gmail.com
+- **Manu Rana** - mmbro1354@gmail.com
+
+---
 
 ## Overview
 
-An AI-powered honeypot that engages scammers in realistic conversations, extracts threat intelligence (UPI IDs, bank accounts, phishing URLs), and reports findings to the GUVI Hackathon API.
+An AI-powered honeypot system that engages scammers in realistic conversations using a human persona, automatically extracts threat intelligence (UPI IDs, bank accounts, phone numbers, phishing URLs), detects scam patterns, and collects evidence for law enforcement.
+
+### Key Features
+
+✅ **Agentic AI Engagement** - LLM-powered realistic persona (Rajesh Kumar, 67-year-old retired teacher)  
+✅ **Intelligence Extraction** - Automatic extraction of UPI IDs, bank details, phone numbers, URLs  
+✅ **Scam Detection** - Pattern-based detection of investment, lottery, phishing, and job scams  
+✅ **Threat Assessment** - Real-time threat level calculation (0.0-1.0)  
+✅ **Evidence Collection** - Structured storage of conversations and extracted intelligence  
+✅ **API Integration** - RESTful API for external systems and law enforcement
 
 ## Tech Stack
 
-- Spring Boot 3.2.2 (Java 17)
-- LLM: Hugging Face API (Llama 3.2) or Ollama (local)
-- Security: Spring Security with API key validation
-- Intelligence: Regex-based pattern extraction
-- Build: Maven
+- **Backend:** Spring Boot 3.2.2 (Java 17)
+- **LLM:** Hugging Face API (Llama 3.3 70B Instruct)
+- **Security:** Spring Security with API key validation
+- **Intelligence:** Regex-based pattern extraction + keyword detection
+- **Build:** Maven
 
 ## Quick Start
 
