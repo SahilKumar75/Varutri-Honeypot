@@ -1,0 +1,59 @@
+package com.varutri.honeypot.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * Security filter to validate API key in request headers
+ */
+@Slf4j
+@Component
+public class ApiKeyFilter extends OncePerRequestFilter {
+
+    @Value("${varutri.api-key}")
+    private String validApiKey;
+
+    private static final String API_KEY_HEADER = "x-api-key";
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+
+        String requestApiKey = request.getHeader(API_KEY_HEADER);
+
+        // Allow health check endpoint without API key
+        if (request.getRequestURI().contains("/actuator") ||
+                request.getRequestURI().contains("/health")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (requestApiKey == null || requestApiKey.isEmpty()) {
+            log.warn("Missing API key in request from IP: {}", request.getRemoteAddr());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"status\":\"error\",\"reply\":\"Missing API key\"}");
+            return;
+        }
+
+        if (!validApiKey.equals(requestApiKey)) {
+            log.warn("Invalid API key attempt from IP: {}", request.getRemoteAddr());
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"status\":\"error\",\"reply\":\"Invalid API key\"}");
+            return;
+        }
+
+        log.debug("API key validated successfully");
+        filterChain.doFilter(request, response);
+    }
+}
