@@ -1,6 +1,5 @@
 package com.varutri.honeypot.service;
 
-import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.FinalResultRequest;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
