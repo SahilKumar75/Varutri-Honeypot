@@ -26,7 +26,7 @@ public class CallbackService {
             @Value("${hackathon.team-id}") String teamId) {
         this.teamId = teamId;
         this.webClient = WebClient.builder()
-                .baseUrl(callbackUrl)
+                .baseUrl(callbackUrl != null ? callbackUrl : "https://hackathon.guvi.in/api/updateHoneyPotFinalResult")
                 .build();
 
         log.info("Callback service initialized for team: {} to URL: {}", teamId, callbackUrl);
@@ -51,17 +51,22 @@ public class CallbackService {
                     .timestamp(getCurrentTimestamp())
                     .build();
 
-            log.info("📊 Sending final report for session {}: {} UPIs, {} accounts, {} URLs, {} turns",
-                    sessionId, upiIds.size(), bankAccounts.size(), phishingLinks.size(), conversationTurns);
+            if (request != null) {
+                log.info("📊 Sending final report for session {}: {} UPIs, {} accounts, {} URLs, {} turns",
+                        sessionId, upiIds.size(), bankAccounts.size(), phishingLinks.size(), conversationTurns);
 
-            Mono<String> responseMono = webClient.post()
-                    .bodyValue(request)
-                    .retrieve()
-                    .bodyToMono(String.class);
+                Mono<String> responseMono = webClient.post()
+                        .uri("/updateHoneyPotFinalResult")
+                        .bodyValue(request)
+                        .retrieve()
+                        .bodyToMono(String.class);
 
-            String response = responseMono.block();
+                String response = responseMono.block();
 
-            log.info("✅ Final report sent successfully for session {}: {}", sessionId, response);
+                log.info("✅ Final report sent successfully for session {}: {}", sessionId, response);
+            } else {
+                log.error("❌ Failed to build request for session {}", sessionId);
+            }
 
         } catch (Exception e) {
             log.error("❌ Error sending final report for session {}: {}", sessionId, e.getMessage(), e);

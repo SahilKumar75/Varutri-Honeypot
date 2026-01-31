@@ -28,7 +28,7 @@ public class OllamaService {
             @Value("${ollama.timeout:30}") int timeout) {
         this.model = model;
         this.webClient = WebClient.builder()
-                .baseUrl(baseUrl)
+                .baseUrl(baseUrl != null ? baseUrl : "http://localhost:11434")
                 .build();
 
         log.info("Ollama service initialized with model: {} at {}", model, baseUrl);
