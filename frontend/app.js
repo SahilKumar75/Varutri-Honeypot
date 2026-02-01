@@ -1,5 +1,5 @@
 // Configuration
-const API_URL = 'http://localhost:8080';
+const API_URL = 'https://varutri-honeypot.onrender.com';
 const API_KEY = 'varutri_shield_2026';
 
 // State
