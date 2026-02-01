@@ -13,147 +13,149 @@
         <!-- Top Header -->
         <header class="top-header">
             <div class="header-left">
-                <div class="logo-section">
-                    <span class="logo">VARUTRI CONTROL INTERFACE</span>
-                    <span class="classification">[CLASSIFIED ACCESS]</span>
-                </div>
+                <span class="logo">VARUTRI HONEYPOT SYSTEM</span>
             </div>
             <div class="header-right">
-                <span class="system-status">System Status: <span class="status-online">ONLINE</span></span>
                 <span class="timestamp" id="timestamp"></span>
             </div>
         </header>
 
         <!-- Main Content -->
         <div class="main-content">
-            <!-- Left Panel: Conversation Control -->
-            <div class="left-panel">
-                <div class="panel-header">
-                    <span>CONVERSATION MONITOR</span>
-                    <div class="control-status">
-                        <span id="controlStatus">AI IN CONTROL</span>
+            <!-- Sessions List View (Default) -->
+            <div class="sessions-view" id="sessionsView">
+                <!-- Active Sessions -->
+                <div class="sessions-section">
+                    <div class="section-header">
+                        <span>ACTIVE SESSIONS</span>
+                        <span class="session-count" id="activeCount">0</span>
+                    </div>
+                    <div class="sessions-list" id="activeSessions">
+                        <div class="empty-state">No active sessions</div>
                     </div>
                 </div>
 
-                <!-- Control Buttons -->
-                <div class="control-buttons">
-                    <button class="control-btn" id="takeControlBtn" onclick="takeControl()">
-                        TAKE CONTROL
-                    </button>
-                    <button class="control-btn disabled" id="giveControlBtn" onclick="giveControl()" disabled>
-                        GIVE CONTROL TO AI
-                    </button>
-                    <button class="control-btn danger" onclick="resetSession()">
-                        TERMINATE SESSION
-                    </button>
-                </div>
-
-                <!-- Session Info -->
-                <div class="session-info">
-                    <div class="info-item">
-                        <span class="label">SESSION ID:</span>
-                        <span class="value" id="sessionId">NONE</span>
+                <!-- Recent Sessions -->
+                <div class="sessions-section">
+                    <div class="section-header">
+                        <span>RECENT SESSIONS</span>
+                        <span class="session-count" id="recentCount">0</span>
                     </div>
-                    <div class="info-item">
-                        <span class="label">MODE:</span>
-                        <span class="value" id="modeStatus">AUTONOMOUS</span>
-                    </div>
-                    <div class="info-item">
-                        <span class="label">MESSAGES:</span>
-                        <span class="value" id="messageCount">0</span>
-                    </div>
-                </div>
-
-                <!-- Conversation Feed -->
-                <div class="conversation-container">
-                    <div class="conversation-feed" id="conversationFeed">
-                        <div class="system-msg">
-                            <span class="msg-timestamp">[SYSTEM]</span>
-                            <span class="msg-content">Honeypot initialized. Awaiting scammer contact...</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Input Area -->
-                <div class="input-container">
-                    <div class="input-label">
-                        <span id="inputLabel">SCAMMER INPUT (SIMULATION)</span>
-                    </div>
-                    <div class="input-area">
-                        <input type="text" id="messageInput" placeholder="Type message..." />
-                        <button onclick="sendMessage()" id="sendBtn">SEND</button>
+                    <div class="sessions-list" id="recentSessions">
+                        <div class="empty-state">No recent sessions</div>
                     </div>
                 </div>
             </div>
 
-            <!-- Right Panel: Threat Analysis -->
-            <div class="right-panel">
-                <!-- Threat Level -->
-                <div class="threat-section">
-                    <div class="section-header">THREAT ASSESSMENT</div>
-                    <div class="threat-display">
-                        <div class="threat-level-label">THREAT LEVEL</div>
-                        <div class="threat-meter-container">
+            <!-- Conversation View (Hidden by default) -->
+            <div class="conversation-view hidden" id="conversationView">
+                <!-- Left Panel: Conversation -->
+                <div class="left-panel">
+                    <div class="panel-header">
+                        <button class="back-btn" onclick="showSessionsList()">← BACK TO SESSIONS</button>
+                        <div class="session-meta">
+                            <span id="currentSessionId">SESSION-001</span>
+                            <span class="separator">|</span>
+                            <span id="currentChannel">WHATSAPP</span>
+                        </div>
+                    </div>
+
+                    <!-- Conversation Feed -->
+                    <div class="conversation-feed" id="conversationFeed">
+                        <div class="system-msg">
+                            <span class="msg-timestamp">[SYSTEM]</span>
+                            <span class="msg-content">Select a session to view conversation</span>
+                        </div>
+                    </div>
+
+                    <!-- Input Area (For Testing/Simulation) -->
+                    <div class="input-container">
+                        <div class="input-label">SIMULATE SCAMMER MESSAGE (TESTING ONLY)</div>
+                        <div class="input-area">
+                            <input type="text" id="messageInput" placeholder="Type message to simulate scammer..." />
+                            <button onclick="sendMessage()" id="sendBtn">SEND</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Intelligence -->
+                <div class="right-panel">
+                    <!-- AI Intervention Stats -->
+                    <div class="stats-section">
+                        <div class="section-header">AI INTERVENTION</div>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-label">TOTAL MESSAGES</div>
+                                <div class="stat-value" id="totalMessages">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">AI RESPONSES</div>
+                                <div class="stat-value" id="aiResponses">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">SCAMMER MSGS</div>
+                                <div class="stat-value" id="scammerMessages">0</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">DURATION</div>
+                                <div class="stat-value" id="sessionDuration">0m</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Threat Assessment -->
+                    <div class="threat-section">
+                        <div class="section-header">THREAT LEVEL</div>
+                        <div class="threat-display">
                             <div class="threat-meter">
                                 <div class="threat-fill" id="threatFill"></div>
+                                <div class="threat-percentage" id="threatPercent">0%</div>
                             </div>
-                            <div class="threat-percentage" id="threatPercent">0%</div>
-                        </div>
-                        <div class="threat-classification" id="threatClass">SAFE</div>
-                    </div>
-                </div>
-
-                <!-- Scam Classification -->
-                <div class="data-section">
-                    <div class="section-header">SCAM CLASSIFICATION</div>
-                    <div class="data-table">
-                        <div class="data-row">
-                            <span class="data-label">TYPE:</span>
-                            <span class="data-value" id="scamType">UNKNOWN</span>
-                        </div>
-                        <div class="data-row">
-                            <span class="data-label">CONFIDENCE:</span>
-                            <span class="data-value" id="confidence">N/A</span>
+                            <div class="threat-classification" id="threatClass">SAFE</div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Intelligence Extracted -->
-                <div class="intel-section">
-                    <div class="section-header">INTELLIGENCE EXTRACTED</div>
-                    <div class="intel-container" id="intelContainer">
-                        <div class="intel-empty">No intelligence gathered</div>
-                    </div>
-                </div>
-
-                <!-- Session Statistics -->
-                <div class="stats-section">
-                    <div class="section-header">SESSION STATISTICS</div>
-                    <div class="stats-grid">
-                        <div class="stat-box">
-                            <div class="stat-value" id="turnCount">0</div>
-                            <div class="stat-label">TURNS</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-value" id="intelCount">0</div>
-                            <div class="stat-label">INTEL ITEMS</div>
+                    <!-- Scam Classification -->
+                    <div class="data-section">
+                        <div class="section-header">CLASSIFICATION</div>
+                        <div class="data-table">
+                            <div class="data-row">
+                                <span class="data-label">TYPE:</span>
+                                <span class="data-value" id="scamType">UNKNOWN</span>
+                            </div>
+                            <div class="data-row">
+                                <span class="data-label">CONFIDENCE:</span>
+                                <span class="data-value" id="confidence">N/A</span>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Quick Actions -->
-                <div class="actions-section">
-                    <button class="action-btn" onclick="runTests()">RUN DIAGNOSTICS</button>
-                    <button class="action-btn" onclick="generateReport()">GENERATE REPORT</button>
+                    <!-- Intelligence Extracted -->
+                    <div class="intel-section">
+                        <div class="section-header">INTELLIGENCE EXTRACTED</div>
+                        <div class="intel-container" id="intelContainer">
+                            <div class="intel-empty">No intelligence gathered</div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="actions-section">
+                        <button class="action-btn" onclick="generateReport()">GENERATE REPORT</button>
+                        <button class="action-btn" onclick="runTests()">RUN DIAGNOSTICS</button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Bottom Status Bar -->
         <footer class="status-bar">
-            <div class="status-item">API: <span id="apiStatus">CONNECTED</span></div>
-            <div class="status-item">ENCRYPTION: <span class="status-active">ACTIVE</span></div>
-            <div class="status-item">REPORTS: <span id="totalReports">0</span></div>
+            <div class="status-left">
+                <span class="status-item">SYSTEM: <span class="status-online">ONLINE</span></span>
+                <span class="status-item">ENCRYPTION: <span class="status-online">ACTIVE</span></span>
+            </div>
+            <div class="status-right">
+                <span class="status-item">REPORTS GENERATED: <span id="totalReports">0</span></span>
+            </div>
         </footer>
     </div>
 
