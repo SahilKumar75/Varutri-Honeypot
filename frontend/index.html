@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VARUTRI HONEYPOT TERMINAL</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="terminal">
+        <!-- Header -->
+        <div class="terminal-header">
+            <div class="header-left">
+                <span class="logo">🛡️ VARUTRI HONEYPOT SYSTEM</span>
+                <span class="status" id="status">● ACTIVE</span>
+            </div>
+            <div class="header-right">
+                <span id="timestamp"></span>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="terminal-body">
+            <!-- Left Panel: Conversation -->
+            <div class="left-panel">
+                <div class="panel-header">
+                    <span>CONVERSATION MONITOR</span>
+                    <span class="session-id" id="sessionId">SESSION: NONE</span>
+                </div>
+                
+                <div class="conversation-feed" id="conversationFeed">
+                    <div class="system-msg">
+                        <span class="timestamp">[SYSTEM]</span>
+                        <span>Honeypot initialized. Waiting for scammer...</span>
+                    </div>
+                </div>
+
+                <!-- Input Area -->
+                <div class="input-area">
+                    <span class="prompt">SCAMMER&gt;</span>
+                    <input type="text" id="scammerInput" placeholder="Type scammer message..." />
+                    <button onclick="sendMessage()">SEND</button>
+                </div>
+            </div>
+
+            <!-- Right Panel: Threat Analysis -->
+            <div class="right-panel">
+                <div class="panel-header">THREAT ANALYSIS</div>
+                
+                <!-- Threat Meter -->
+                <div class="threat-section">
+                    <div class="threat-label">THREAT LEVEL</div>
+                    <div class="threat-meter">
+                        <div class="threat-bar" id="threatBar" style="width: 0%"></div>
+                        <span class="threat-value" id="threatValue">0%</span>
+                    </div>
+                    <div class="threat-status" id="threatStatus">SAFE</div>
+                </div>
+
+                <!-- Scam Type -->
+                <div class="info-section">
+                    <div class="info-label">SCAM TYPE</div>
+                    <div class="info-value" id="scamType">UNKNOWN</div>
+                </div>
+
+                <!-- Intelligence Extracted -->
+                <div class="info-section">
+                    <div class="info-label">INTELLIGENCE EXTRACTED</div>
+                    <div class="intel-list" id="intelList">
+                        <div class="intel-item">No data yet</div>
+                    </div>
+                </div>
+
+                <!-- Session Stats -->
+                <div class="info-section">
+                    <div class="info-label">SESSION STATS</div>
+                    <div class="stats-grid">
+                        <div class="stat">
+                            <span class="stat-label">MESSAGES</span>
+                            <span class="stat-value" id="messageCount">0</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">TURNS</span>
+                            <span class="stat-value" id="turnCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="actions-section">
+                    <button class="action-btn" onclick="runTests()">RUN TESTS</button>
+                    <button class="action-btn" onclick="generateReport()">GENERATE REPORT</button>
+                    <button class="action-btn danger" onclick="resetSession()">RESET SESSION</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="terminal-footer">
+            <span>API: <span id="apiStatus">CONNECTED</span></span>
+            <span>SESSIONS MONITORED: <span id="totalSessions">0</span></span>
+            <span>REPORTS GENERATED: <span id="totalReports">0</span></span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
