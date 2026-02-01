@@ -199,6 +199,9 @@ async function loadConversation(sessionId) {
     const feed = document.getElementById('conversationFeed');
     feed.innerHTML = '';
 
+    // Find the session to get its data
+    const session = [...activeSessions, ...recentSessions].find(s => s.id === sessionId);
+
     try {
         // Try to fetch from API
         const response = await fetch(`${API_URL}/api/evidence/${sessionId}`, {
@@ -227,14 +230,49 @@ async function loadConversation(sessionId) {
         updateThreatPanel(evidence);
 
     } catch (error) {
-        console.error('Error loading conversation:', error);
+        console.log('Backend offline, showing demo conversation');
 
-        // Show demo conversation
+        // Show demo conversation based on session type
         addAIEntryIndicator('AI VARUTRI INITIATED CONVERSATION');
-        addMessageToFeed('scammer', 'Hello! You won 10 lakh rupees in lottery!', new Date());
-        addMessageToFeed('ai', 'Arrey beta! Really? How to claim this prize?', new Date());
-        addMessageToFeed('scammer', 'Send Rs 500 to 9876543210@paytm for processing fee', new Date());
-        addMessageToFeed('ai', 'What is this paytm? I am old person, not understanding...', new Date());
+
+        if (session && session.scamType === 'LOTTERY_SCAM') {
+            addMessageToFeed('scammer', 'Congratulations! You won 10 lakh rupees in lucky draw!', new Date());
+            addMessageToFeed('ai', 'Arrey beta! Really? How did I win? I did not enter any contest...', new Date());
+            addMessageToFeed('scammer', 'No problem madam! Just send Rs 500 processing fee to 9876543210@paytm', new Date());
+            addMessageToFeed('ai', 'What is this paytm? I am old person, not understanding these things...', new Date());
+            addMessageToFeed('scammer', 'Very simple! Just open Paytm app and send to 9876543210', new Date());
+            addMessageToFeed('ai', 'Okay beta, let me try. But why processing fee for my own prize money?', new Date());
+        } else if (session && session.scamType === 'BANK_SCAM') {
+            addMessageToFeed('scammer', 'Hello, this is from SBI Bank. Your account will be blocked.', new Date());
+            addMessageToFeed('ai', 'What happened? Why blocking my account?', new Date());
+            addMessageToFeed('scammer', 'KYC not updated. Send OTP to verify. Call 9123456789', new Date());
+            addMessageToFeed('ai', 'I am scared! What is OTP? How to send?', new Date());
+        } else if (session && session.scamType === 'JOB_SCAM') {
+            addMessageToFeed('scammer', 'Congratulations! Selected for data entry job. Salary 25000/month', new Date());
+            addMessageToFeed('ai', 'Really? I applied for job? What company?', new Date());
+            addMessageToFeed('scammer', 'Yes! Work from home. Just pay 2000 registration fee to account 1234567890', new Date());
+            addMessageToFeed('ai', 'Why registration fee? Genuine companies dont ask money...', new Date());
+        } else {
+            addMessageToFeed('scammer', 'Hello! You won 10 lakh rupees in lottery!', new Date());
+            addMessageToFeed('ai', 'Arrey beta! Really? How to claim this prize?', new Date());
+            addMessageToFeed('scammer', 'Send Rs 500 to 9876543210@paytm for processing fee', new Date());
+            addMessageToFeed('ai', 'What is this paytm? I am old person, not understanding...', new Date());
+        }
+
+        // Create demo evidence data
+        const demoEvidence = {
+            threatLevel: session ? session.threatLevel : 0.85,
+            scamType: session ? session.scamType : 'LOTTERY_SCAM',
+            extractedInfo: {
+                upiIds: ['9876543210@paytm'],
+                phoneNumbers: ['9876543210', '9123456789'],
+                bankAccountNumbers: ['1234567890'],
+                suspiciousKeywords: ['won', 'prize', 'lottery', 'processing fee', 'OTP']
+            }
+        };
+
+        // Update threat panel with demo data
+        updateThreatPanel(demoEvidence);
     }
 }
 
