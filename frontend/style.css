@@ -174,8 +174,19 @@ body {
 
 .session-threat-fill {
     height: 100%;
-    background: linear-gradient(90deg, #4ade80, #fbbf24, #ff4444);
-    transition: width 0.3s;
+    transition: width 0.3s, background-color 0.3s;
+}
+
+.session-threat-fill.low {
+    background: #4ade80;
+}
+
+.session-threat-fill.medium {
+    background: #fbbf24;
+}
+
+.session-threat-fill.high {
+    background: #ff4444;
 }
 
 .session-threat-value {
@@ -497,8 +508,19 @@ body {
 .threat-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #4ade80, #fbbf24, #ff4444);
-    transition: width 0.5s ease;
+    transition: width 0.5s ease, background-color 0.3s;
+}
+
+.threat-fill.low {
+    background: #4ade80;
+}
+
+.threat-fill.medium {
+    background: #fbbf24;
+}
+
+.threat-fill.high {
+    background: #ff4444;
 }
 
 .threat-percentage {

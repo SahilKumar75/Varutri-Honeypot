@@ -16,11 +16,6 @@ window.onload = () => {
 
     // Refresh sessions every 5 seconds
     setInterval(loadSessions, 5000);
-
-    // Enable Enter key to send
-    document.getElementById('messageInput').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
-    });
 };
 
 // Update timestamp
@@ -115,6 +110,10 @@ function createSessionCard(session) {
     const threatClass = threatPercent < 40 ? 'low' : threatPercent < 70 ? 'medium' : 'high';
     const duration = Math.round((Date.now() - session.startTime.getTime()) / 60000);
 
+    // Active sessions show UNKNOWN, completed sessions show actual type
+    const displayScamType = session.status === 'active' ? 'UNKNOWN' : session.scamType;
+    const displayThreat = session.status === 'active' ? 'ANALYZING...' : `${threatPercent}%`;
+
     return `
         <div class="session-card" onclick="viewSession('${session.id}')">
             <div class="session-card-header">
@@ -124,7 +123,7 @@ function createSessionCard(session) {
             <div class="session-card-body">
                 <div class="session-info-row">
                     <span class="session-info-label">SCAM TYPE:</span>
-                    <span class="session-info-value">${session.scamType}</span>
+                    <span class="session-info-value">${displayScamType}</span>
                 </div>
                 <div class="session-info-row">
                     <span class="session-info-label">MESSAGES:</span>
@@ -136,9 +135,9 @@ function createSessionCard(session) {
                 </div>
                 <div class="session-threat">
                     <div class="session-threat-bar">
-                        <div class="session-threat-fill" style="width: ${threatPercent}%"></div>
+                        <div class="session-threat-fill ${threatClass}" style="width: ${session.status === 'active' ? '0' : threatPercent}%"></div>
                     </div>
-                    <span class="session-threat-value ${threatClass}">${threatPercent}%</span>
+                    <span class="session-threat-value ${threatClass}">${displayThreat}</span>
                 </div>
             </div>
         </div>
@@ -247,58 +246,6 @@ function addMessageToFeed(type, text, timestamp) {
     feed.scrollTop = feed.scrollHeight;
 }
 
-// Send message (for testing)
-async function sendMessage() {
-    if (!currentSessionId) {
-        alert('Please select a session first');
-        return;
-    }
-
-    const input = document.getElementById('messageInput');
-    const message = input.value.trim();
-
-    if (!message) return;
-
-    input.value = '';
-
-    // Add scammer message
-    addMessageToFeed('scammer', message, new Date());
-
-    try {
-        // Call API
-        const response = await fetch(`${API_URL}/api/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': API_KEY
-            },
-            body: JSON.stringify({
-                sessionId: currentSessionId,
-                message: {
-                    sender: 'scammer',
-                    text: message,
-                    timestamp: new Date().toISOString()
-                }
-            })
-        });
-
-        const data = await response.json();
-
-        // Add AI response
-        addMessageToFeed('ai', data.reply, new Date());
-
-        // Update stats
-        updateSessionStats();
-
-        // Update threat panel
-        await loadConversationData();
-
-    } catch (error) {
-        console.error('Error:', error);
-        addMessageToFeed('system', `[ERROR] API connection failed: ${error.message}`, new Date());
-    }
-}
-
 // Update session stats
 function updateSessionStats() {
     const scammerMsgs = document.querySelectorAll('.scammer-msg').length;
@@ -332,7 +279,19 @@ function updateThreatPanel(evidence) {
     const threatLevel = evidence.threatLevel || 0;
     const threatPercent = Math.round(threatLevel * 100);
 
-    document.getElementById('threatFill').style.width = `${threatPercent}%`;
+    const fillEl = document.getElementById('threatFill');
+    fillEl.style.width = `${threatPercent}%`;
+
+    // Set color class based on level
+    fillEl.className = 'threat-fill';
+    if (threatLevel < 0.4) {
+        fillEl.classList.add('low');
+    } else if (threatLevel < 0.7) {
+        fillEl.classList.add('medium');
+    } else {
+        fillEl.classList.add('high');
+    }
+
     document.getElementById('threatPercent').textContent = `${threatPercent}%`;
 
     // Update threat classification
@@ -344,7 +303,6 @@ function updateThreatPanel(evidence) {
         classEl.classList.add('safe');
     } else if (threatLevel < 0.7) {
         classEl.textContent = 'MEDIUM THREAT';
-        classEl.classList.add('medium');
     } else {
         classEl.textContent = 'HIGH THREAT';
         classEl.classList.add('high');
