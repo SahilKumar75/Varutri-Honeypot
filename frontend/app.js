@@ -52,8 +52,27 @@ function updateTimestamp() {
 // Load sessions
 async function loadSessions() {
     try {
-        // In production, this would fetch from API
-        // For now, create demo sessions with STABLE IDs
+        // Try to fetch sessions from API
+        const response = await fetch(`${API_URL}/api/sessions/active`, {
+            headers: { 'x-api-key': API_KEY }
+        });
+
+        if (response.ok) {
+            const sessions = await response.json();
+
+            // Separate active and recent sessions
+            activeSessions = sessions.filter(s => s.status === 'active');
+            recentSessions = sessions.filter(s => s.status === 'completed').slice(0, 10);
+
+            console.log('Loaded from API:', activeSessions.length, 'active,', recentSessions.length, 'recent');
+        } else {
+            throw new Error('API returned ' + response.status);
+        }
+
+    } catch (error) {
+        console.log('API unavailable, using demo sessions');
+
+        // Fallback to demo sessions with STABLE IDs
         if (activeSessions.length === 0) {
             activeSessions = [
                 {
@@ -93,12 +112,9 @@ async function loadSessions() {
                 }
             ];
         }
-
-        renderSessions();
-
-    } catch (error) {
-        console.error('Error loading sessions:', error);
     }
+
+    renderSessions();
 }
 
 // Render sessions

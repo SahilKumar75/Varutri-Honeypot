@@ -227,6 +227,10 @@ body {
     display: none;
 }
 
+.hidden {
+    display: none !important;
+}
+
 /* Left Panel */
 .left-panel {
     flex: 1.5;
