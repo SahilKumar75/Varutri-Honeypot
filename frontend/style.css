@@ -45,11 +45,33 @@ body {
     color: #00ff41;
     font-size: 14px;
     animation: pulse 2s infinite;
+    position: relative;
+    padding-left: 15px;
+}
+
+.status::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #00ff41;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #00ff41;
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
 }
 
 .header-right {
@@ -111,7 +133,9 @@ body {
     border-radius: 4px;
 }
 
-.system-msg, .scammer-msg, .ai-msg {
+.system-msg,
+.scammer-msg,
+.ai-msg {
     padding: 10px;
     border-left: 3px solid;
     background: rgba(0, 255, 65, 0.05);
@@ -123,6 +147,7 @@ body {
         opacity: 0;
         transform: translateX(-10px);
     }
+
     to {
         opacity: 1;
         transform: translateX(0);
@@ -253,13 +278,18 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
     animation: scan 2s infinite;
 }
 
 @keyframes scan {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(100%);
+    }
 }
 
 .threat-value {
@@ -282,13 +312,28 @@ body {
     animation: glow 2s infinite;
 }
 
-.threat-status.safe { color: #00ff41; }
-.threat-status.medium { color: #ffff00; }
-.threat-status.high { color: #ff4444; }
+.threat-status.safe {
+    color: #00ff41;
+}
+
+.threat-status.medium {
+    color: #ffff00;
+}
+
+.threat-status.high {
+    color: #ff4444;
+}
 
 @keyframes glow {
-    0%, 100% { text-shadow: 0 0 5px currentColor; }
-    50% { text-shadow: 0 0 20px currentColor; }
+
+    0%,
+    100% {
+        text-shadow: 0 0 5px currentColor;
+    }
+
+    50% {
+        text-shadow: 0 0 20px currentColor;
+    }
 }
 
 /* Info Sections */
@@ -414,8 +459,9 @@ body {
     .terminal-body {
         flex-direction: column;
     }
-    
-    .left-panel, .right-panel {
+
+    .left-panel,
+    .right-panel {
         flex: 1;
     }
 }
