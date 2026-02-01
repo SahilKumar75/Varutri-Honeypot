@@ -2,10 +2,10 @@
 
 ## Why Hugging Face?
 
-✅ **No local installation** - Runs in the cloud  
-✅ **Free tier available** - 30,000 requests/month  
-✅ **Lighter on your laptop** - No GPU/RAM needed  
-✅ **Fast setup** - Just need an API key  
+ **No local installation** - Runs in the cloud  
+ **Free tier available** - 30,000 requests/month  
+ **Lighter on your laptop** - No GPU/RAM needed  
+ **Fast setup** - Just need an API key  
 
 ## Setup Steps (5 minutes)
 
@@ -101,4 +101,4 @@ The code automatically switches between providers!
 
 ---
 
-**Ready to go!** No Ollama needed, just get your HF token and you're set! 🚀
+**Ready to go!** No Ollama needed, just get your HF token and you're set! 

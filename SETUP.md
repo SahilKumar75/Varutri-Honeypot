@@ -1,6 +1,6 @@
 # Varutri Honeypot - Setup & Deployment Guide
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### 1. Prerequisites Check
 ```bash
@@ -75,13 +75,13 @@ mvn test
 mvn test -Dtest=IntelligenceExtractorTest
 ```
 
-## 📊 Monitor Logs
+##  Monitor Logs
 
 The application logs all important events:
 - 📩 Incoming messages
-- 🎯 Detected intelligence (UPI, accounts, URLs)
-- ✅ Successful responses
-- 📊 Final callbacks sent
+-  Detected intelligence (UPI, accounts, URLs)
+-  Successful responses
+-  Final callbacks sent
 
 Check console output for real-time monitoring.
 
@@ -102,15 +102,15 @@ Edit `src/main/resources/application.properties`:
 
 ## 🏆 Buildathon Success Checklist
 
-- ✅ API responds with correct JSON format
-- ✅ API key validation works
-- ✅ Persona-driven conversations
-- ✅ Intelligence extraction (UPI/Bank/URLs)
-- ✅ Final callback to GUVI API
-- ✅ Session tracking and turn counting
-- ✅ Comprehensive logging
+-  API responds with correct JSON format
+-  API key validation works
+-  Persona-driven conversations
+-  Intelligence extraction (UPI/Bank/URLs)
+-  Final callback to GUVI API
+-  Session tracking and turn counting
+-  Comprehensive logging
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Ollama Connection Failed
 ```bash

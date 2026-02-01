@@ -73,8 +73,8 @@ whatsapp.verify.token=varutri_webhook_2026
 ### Subscribe to Webhook Fields
 1. After verification, click **"Manage"**
 2. Subscribe to:
-   - ✅ `messages`
-   - ✅ `message_status`
+   -  `messages`
+   -  `message_status`
 
 ---
 
@@ -185,11 +185,11 @@ curl -X POST https://varutri-honeypot.onrender.com/api/whatsapp/takeover \
 
 ## Next Steps
 
-1. ✅ Complete Meta app setup
-2. ✅ Configure webhook
-3. ✅ Test with your phone
-4. ✅ Share WhatsApp Business number with users
-5. ✅ Monitor intelligence extraction
+1.  Complete Meta app setup
+2.  Configure webhook
+3.  Test with your phone
+4.  Share WhatsApp Business number with users
+5.  Monitor intelligence extraction
 
 ---
 

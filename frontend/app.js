@@ -13,7 +13,7 @@ window.onload = () => {
     setInterval(updateTimestamp, 1000);
     loadStats();
     document.getElementById('sessionId').textContent = `SESSION: ${currentSessionId}`;
-    
+
     // Enable Enter key to send
     document.getElementById('scammerInput').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
@@ -31,16 +31,16 @@ function updateTimestamp() {
 async function sendMessage() {
     const input = document.getElementById('scammerInput');
     const message = input.value.trim();
-    
+
     if (!message) return;
-    
+
     // Clear input
     input.value = '';
-    
+
     // Add scammer message to feed
     addMessageToFeed('scammer', message);
     messageCount++;
-    
+
     try {
         // Call API
         const response = await fetch(`${API_URL}/api/chat`, {
@@ -60,20 +60,20 @@ async function sendMessage() {
                 metadata: {}
             })
         });
-        
+
         const data = await response.json();
-        
+
         // Add AI response to feed
         addMessageToFeed('ai', data.reply);
         messageCount++;
         turnCount++;
-        
+
         // Update stats
         updateStats();
-        
+
         // Get evidence to update threat panel
         await updateThreatPanel();
-        
+
     } catch (error) {
         console.error('Error:', error);
         addMessageToFeed('system', `ERROR: ${error.message}`);
@@ -87,15 +87,15 @@ function addMessageToFeed(type, text) {
     const feed = document.getElementById('conversationFeed');
     const msgDiv = document.createElement('div');
     msgDiv.className = `${type}-msg`;
-    
+
     const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
     const label = type === 'scammer' ? 'SCAMMER' : type === 'ai' ? 'VARUTRI' : 'SYSTEM';
-    
+
     msgDiv.innerHTML = `
         <span class="timestamp">[${timestamp}] ${label}:</span>
         <span>${text}</span>
     `;
-    
+
     feed.appendChild(msgDiv);
     feed.scrollTop = feed.scrollHeight;
 }
@@ -106,16 +106,16 @@ async function updateThreatPanel() {
         const response = await fetch(`${API_URL}/api/evidence/${currentSessionId}`, {
             headers: { 'x-api-key': API_KEY }
         });
-        
+
         const evidence = await response.json();
-        
+
         // Update threat level
         const threatLevel = evidence.threatLevel || 0;
         const threatPercent = Math.round(threatLevel * 100);
-        
+
         document.getElementById('threatBar').style.width = `${threatPercent}%`;
         document.getElementById('threatValue').textContent = `${threatPercent}%`;
-        
+
         // Update threat status
         const statusEl = document.getElementById('threatStatus');
         if (threatLevel < 0.4) {
@@ -128,55 +128,55 @@ async function updateThreatPanel() {
             statusEl.textContent = 'HIGH THREAT';
             statusEl.className = 'threat-status high';
         }
-        
+
         // Update scam type
         document.getElementById('scamType').textContent = evidence.scamType || 'UNKNOWN';
-        
+
         // Update intelligence list
         const intel = evidence.extractedInfo || {};
         const intelList = document.getElementById('intelList');
         intelList.innerHTML = '';
-        
+
         let hasIntel = false;
-        
+
         if (intel.upiIds && intel.upiIds.length > 0) {
             intel.upiIds.forEach(upi => {
-                addIntelItem('🔴 UPI ID: ' + upi, true);
+                addIntelItem('[CRITICAL] UPI ID: ' + upi, true);
                 hasIntel = true;
             });
         }
-        
+
         if (intel.bankAccountNumbers && intel.bankAccountNumbers.length > 0) {
             intel.bankAccountNumbers.forEach(acc => {
-                addIntelItem('🔴 BANK ACC: ' + acc, true);
+                addIntelItem('[CRITICAL] BANK ACC: ' + acc, true);
                 hasIntel = true;
             });
         }
-        
+
         if (intel.phoneNumbers && intel.phoneNumbers.length > 0) {
             intel.phoneNumbers.forEach(phone => {
-                addIntelItem('📱 PHONE: ' + phone, true);
+                addIntelItem('[INFO] PHONE: ' + phone, true);
                 hasIntel = true;
             });
         }
-        
+
         if (intel.urls && intel.urls.length > 0) {
             intel.urls.forEach(url => {
-                addIntelItem('🔗 URL: ' + url, true);
+                addIntelItem('[LINK] URL: ' + url, true);
                 hasIntel = true;
             });
         }
-        
+
         if (intel.suspiciousKeywords && intel.suspiciousKeywords.length > 0) {
             const keywords = intel.suspiciousKeywords.slice(0, 5).join(', ');
-            addIntelItem('⚠️ KEYWORDS: ' + keywords, false);
+            addIntelItem('[WARN] KEYWORDS: ' + keywords, false);
             hasIntel = true;
         }
-        
+
         if (!hasIntel) {
             intelList.innerHTML = '<div class="intel-item">No intelligence extracted yet</div>';
         }
-        
+
     } catch (error) {
         console.error('Error updating threat panel:', error);
     }
@@ -203,13 +203,13 @@ async function loadStats() {
         const response = await fetch(`${API_URL}/api/report/stats`, {
             headers: { 'x-api-key': API_KEY }
         });
-        
+
         const stats = await response.json();
         document.getElementById('totalReports').textContent = stats.totalReports || 0;
-        
+
         document.getElementById('apiStatus').textContent = 'CONNECTED';
         document.getElementById('apiStatus').style.color = '#00ff41';
-        
+
     } catch (error) {
         console.error('Error loading stats:', error);
         document.getElementById('apiStatus').textContent = 'DISCONNECTED';
@@ -220,23 +220,23 @@ async function loadStats() {
 // Run tests
 async function runTests() {
     addMessageToFeed('system', 'Running test scenarios...');
-    
+
     try {
         const response = await fetch(`${API_URL}/api/test/run-all`, {
             method: 'POST',
             headers: { 'x-api-key': API_KEY }
         });
-        
+
         const results = await response.json();
-        
+
         results.forEach(result => {
-            const status = result.passed ? '✅ PASS' : '❌ FAIL';
+            const status = result.passed ? '[PASS]' : '[FAIL]';
             addMessageToFeed('system', `${status}: ${result.scenarioName} (${result.totalMessages} messages)`);
         });
-        
+
         const passed = results.filter(r => r.passed).length;
         addMessageToFeed('system', `Tests complete: ${passed}/${results.length} passed`);
-        
+
     } catch (error) {
         addMessageToFeed('system', `Test error: ${error.message}`);
     }
@@ -248,9 +248,9 @@ async function generateReport() {
         addMessageToFeed('system', 'No conversation to report. Send some messages first.');
         return;
     }
-    
+
     addMessageToFeed('system', 'Generating government report...');
-    
+
     try {
         const response = await fetch(`${API_URL}/api/report/manual`, {
             method: 'POST',
@@ -260,17 +260,17 @@ async function generateReport() {
             },
             body: JSON.stringify({ sessionId: currentSessionId })
         });
-        
+
         const result = await response.json();
-        
+
         if (result.status === 'success') {
-            addMessageToFeed('system', `✅ Report ${result.reportId} generated successfully!`);
+            addMessageToFeed('system', `[SUCCESS] Report ${result.reportId} generated successfully!`);
             addMessageToFeed('system', `Threat Level: ${(result.threatLevel * 100).toFixed(0)}% | Intelligence: ${result.intelligenceCount} items`);
             loadStats();
         } else {
-            addMessageToFeed('system', `❌ Report failed: ${result.message}`);
+            addMessageToFeed('system', `[ERROR] Report failed: ${result.message}`);
         }
-        
+
     } catch (error) {
         addMessageToFeed('system', `Report error: ${error.message}`);
     }
@@ -281,7 +281,7 @@ function resetSession() {
     currentSessionId = 'demo-' + Date.now();
     messageCount = 0;
     turnCount = 0;
-    
+
     document.getElementById('sessionId').textContent = `SESSION: ${currentSessionId}`;
     document.getElementById('conversationFeed').innerHTML = `
         <div class="system-msg">
@@ -289,13 +289,13 @@ function resetSession() {
             <span>Session reset. New session ID: ${currentSessionId}</span>
         </div>
     `;
-    
+
     document.getElementById('threatBar').style.width = '0%';
     document.getElementById('threatValue').textContent = '0%';
     document.getElementById('threatStatus').textContent = 'SAFE';
     document.getElementById('threatStatus').className = 'threat-status safe';
     document.getElementById('scamType').textContent = 'UNKNOWN';
     document.getElementById('intelList').innerHTML = '<div class="intel-item">No data yet</div>';
-    
+
     updateStats();
 }

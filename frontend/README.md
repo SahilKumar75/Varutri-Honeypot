@@ -19,11 +19,11 @@ A cyberpunk-themed terminal dashboard for monitoring scam conversations in real-
   - Red (70-100%): High Threat
 - **Scam Type Detection**: Shows detected scam category
 - **Intelligence Extracted**: Real-time list of:
-  - 🔴 UPI IDs
-  - 🔴 Bank Accounts
-  - 📱 Phone Numbers
-  - 🔗 Phishing URLs
-  - ⚠️ Suspicious Keywords
+  -  UPI IDs
+  -  Bank Accounts
+  -  Phone Numbers
+  -  Phishing URLs
+  -  Suspicious Keywords
 - **Session Stats**: Message count and turn count
 - **Quick Actions**:
   - Run Tests
@@ -128,4 +128,4 @@ The terminal shows:
 - Real-time intelligence extraction
 - Glowing green matrix aesthetic
 
-Perfect for hackathon demos! 🛡️
+Perfect for hackathon demos! 

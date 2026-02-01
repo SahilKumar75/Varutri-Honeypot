@@ -2,8 +2,8 @@
 
 ## Current Status
 
-✅ **Code pushed to GitHub**: https://github.com/SahilKumar75/Varutri-Honeypot  
-⚠️ **27 IDE errors showing**: All are Lombok annotation processing issues
+ **Code pushed to GitHub**: https://github.com/SahilKumar75/Varutri-Honeypot  
+ **27 IDE errors showing**: All are Lombok annotation processing issues
 
 ## What's Happening?
 
@@ -13,7 +13,7 @@ All the "cannot be resolved" errors you're seeing are because **Lombok annotatio
 - Generated `log` field from `@Slf4j`
 - Generated builder methods from `@Builder`
 
-## ✅ Solution: Install Lombok in IntelliJ IDEA
+##  Solution: Install Lombok in IntelliJ IDEA
 
 ### Step 1: Install Lombok Plugin
 1. Open IntelliJ IDEA
@@ -25,7 +25,7 @@ All the "cannot be resolved" errors you're seeing are because **Lombok annotatio
 
 ### Step 2: Enable Annotation Processing
 1. Go to **Settings** → **Build, Execution, Deployment** → **Compiler** → **Annotation Processors**
-2. Check ☑️ "**Enable annotation processing**"
+2. Check  "**Enable annotation processing**"
 3. Click **Apply**
 
 ### Step 3: Import Project
@@ -36,7 +36,7 @@ All the "cannot be resolved" errors you're seeing are because **Lombok annotatio
 ### Step 4: Verify
 All 27 errors should disappear! The IDE will now recognize all Lombok-generated code.
 
-## 🚀 Then Run the Application
+##  Then Run the Application
 
 ```bash
 # Make sure Ollama is running first
@@ -59,4 +59,4 @@ ollama pull llama3
 
 ---
 
-**Bottom Line**: The code is 100% correct and on GitHub. The IDE errors will vanish once Lombok plugin is installed! 🎯
+**Bottom Line**: The code is 100% correct and on GitHub. The IDE errors will vanish once Lombok plugin is installed! 
