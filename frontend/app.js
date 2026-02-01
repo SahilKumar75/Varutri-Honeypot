@@ -16,7 +16,23 @@ window.onload = () => {
 
     // Refresh sessions every 5 seconds
     setInterval(loadSessions, 5000);
+
+    // Event delegation for session card clicks
+    document.getElementById('activeSessions').addEventListener('click', handleSessionClick);
+    document.getElementById('recentSessions').addEventListener('click', handleSessionClick);
 };
+
+// Handle session card click
+function handleSessionClick(event) {
+    const card = event.target.closest('.session-card');
+    if (card) {
+        const sessionId = card.dataset.sessionId;
+        console.log('Card clicked, session ID:', sessionId);
+        if (sessionId) {
+            viewSession(sessionId);
+        }
+    }
+}
 
 // Update timestamp
 function updateTimestamp() {
@@ -37,42 +53,46 @@ function updateTimestamp() {
 async function loadSessions() {
     try {
         // In production, this would fetch from API
-        // For now, create demo sessions
-        activeSessions = [
-            {
-                id: 'session-' + Date.now(),
-                channel: 'WHATSAPP',
-                scamType: 'LOTTERY_SCAM',
-                threatLevel: 0.85,
-                messages: 12,
-                aiResponses: 6,
-                startTime: new Date(Date.now() - 300000),
-                status: 'active'
-            }
-        ];
+        // For now, create demo sessions with STABLE IDs
+        if (activeSessions.length === 0) {
+            activeSessions = [
+                {
+                    id: 'session-active-001',
+                    channel: 'WHATSAPP',
+                    scamType: 'LOTTERY_SCAM',
+                    threatLevel: 0.85,
+                    messages: 12,
+                    aiResponses: 6,
+                    startTime: new Date(Date.now() - 300000),
+                    status: 'active'
+                }
+            ];
+        }
 
-        recentSessions = [
-            {
-                id: 'session-' + (Date.now() - 1000000),
-                channel: 'WHATSAPP',
-                scamType: 'BANK_SCAM',
-                threatLevel: 0.72,
-                messages: 18,
-                aiResponses: 9,
-                startTime: new Date(Date.now() - 3600000),
-                status: 'completed'
-            },
-            {
-                id: 'session-' + (Date.now() - 2000000),
-                channel: 'TELEGRAM',
-                scamType: 'JOB_SCAM',
-                threatLevel: 0.45,
-                messages: 8,
-                aiResponses: 4,
-                startTime: new Date(Date.now() - 7200000),
-                status: 'completed'
-            }
-        ];
+        if (recentSessions.length === 0) {
+            recentSessions = [
+                {
+                    id: 'session-recent-001',
+                    channel: 'WHATSAPP',
+                    scamType: 'BANK_SCAM',
+                    threatLevel: 0.72,
+                    messages: 18,
+                    aiResponses: 9,
+                    startTime: new Date(Date.now() - 3600000),
+                    status: 'completed'
+                },
+                {
+                    id: 'session-recent-002',
+                    channel: 'TELEGRAM',
+                    scamType: 'JOB_SCAM',
+                    threatLevel: 0.45,
+                    messages: 8,
+                    aiResponses: 4,
+                    startTime: new Date(Date.now() - 7200000),
+                    status: 'completed'
+                }
+            ];
+        }
 
         renderSessions();
 
@@ -115,7 +135,7 @@ function createSessionCard(session) {
     const displayThreat = session.status === 'active' ? 'ANALYZING...' : `${threatPercent}%`;
 
     return `
-        <div class="session-card" onclick="viewSession('${session.id}')">
+        <div class="session-card" data-session-id="${session.id}">
             <div class="session-card-header">
                 <span class="session-id">${session.id.substring(0, 16)}...</span>
                 <span class="session-channel">${session.channel}</span>
@@ -146,6 +166,7 @@ function createSessionCard(session) {
 
 // View session
 async function viewSession(sessionId) {
+    console.log('viewSession called with:', sessionId);
     currentSessionId = sessionId;
 
     // Hide sessions view, show conversation view
@@ -157,6 +178,7 @@ async function viewSession(sessionId) {
 
     // Find session
     const session = [...activeSessions, ...recentSessions].find(s => s.id === sessionId);
+    console.log('Found session:', session);
     if (session) {
         document.getElementById('currentChannel').textContent = session.channel;
     }
