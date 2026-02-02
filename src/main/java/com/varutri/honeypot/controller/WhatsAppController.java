@@ -192,11 +192,9 @@ public class WhatsAppController {
             // Get AI response
             String aiResponse;
             if ("ollama".equalsIgnoreCase(llmProvider)) {
-                aiResponse = ollamaService.generateResponse(messageText, request.getConversationHistory(), "UNKNOWN",
-                        0.5);
+                aiResponse = ollamaService.generateResponse(messageText, request.getConversationHistory());
             } else {
-                aiResponse = huggingFaceService.generateResponse(messageText, request.getConversationHistory(),
-                        "UNKNOWN", 0.5);
+                aiResponse = huggingFaceService.generateResponse(messageText, request.getConversationHistory());
             }
 
             // Store conversation
