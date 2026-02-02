@@ -1,4 +1,4 @@
-# 🚀 GitHub Repository Setup Instructions
+#  GitHub Repository Setup Instructions
 
 ## You need to create the repository on GitHub first!
 
@@ -37,9 +37,9 @@ git push -u origin main
 ### Step 4: Verify
 
 Check that your repository has:
-- ✅ All 18 files
-- ✅ README.md visible on main page
-- ✅ Teammate added as collaborator
+-  All 18 files
+-  README.md visible on main page
+-  Teammate added as collaborator
 
 ---
 
@@ -80,7 +80,7 @@ Your initial commit includes:
 
 ---
 
-## 🎯 Next Steps After Pushing to GitHub
+##  Next Steps After Pushing to GitHub
 
 1. **Start Ollama**: `ollama serve` and `ollama pull llama3`
 2. **Test locally**: `mvn spring-boot:run`

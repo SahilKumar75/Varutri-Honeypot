@@ -1,10 +1,10 @@
-# ⚠️ IMPORTANT: Building This Project
+#  IMPORTANT: Building This Project
 
 ## Lombok Requirement
 
 This project uses **Lombok** to reduce boilerplate code. Maven command-line builds currently have an annotation processing configuration issue.
 
-### ✅ **Recommended: Use IntelliJ IDEA**
+###  **Recommended: Use IntelliJ IDEA**
 
 1. **Install Lombok Plugin**:
    - IntelliJ IDEA → Settings → Plugins → Search "Lombok" → Install

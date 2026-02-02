@@ -42,6 +42,9 @@ public class HoneypotController {
     @Autowired
     private EvidenceCollector evidenceCollector;
 
+    @Autowired
+    private GovernmentReportService governmentReportService;
+
     @Value("${varutri.session.max-turns:20}")
     private int maxTurns;
 
@@ -95,6 +98,9 @@ public class HoneypotController {
             if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
                 log.info("Session {} reached max turns ({}), triggering final callback", sessionId, turnCount);
                 sendFinalCallback(sessionId);
+
+                // Trigger automatic government report if high threat
+                governmentReportService.processAutoReport(sessionId);
             }
 
             log.info("Response generated for session {} (turn {})", sessionId, turnCount);

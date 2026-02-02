@@ -2,6 +2,7 @@ package com.varutri.honeypot.service;
 
 import com.varutri.honeypot.dto.ExtractedInfo;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,6 +17,9 @@ import java.util.regex.Pattern;
 @Slf4j
 @Service
 public class InformationExtractor {
+
+    @Autowired
+    private ScamDetector scamDetector;
 
     // Regex patterns for various information types
     private static final Pattern UPI_PATTERN = Pattern.compile(
@@ -54,6 +58,9 @@ public class InformationExtractor {
         info.setIfscCodes(extractIFSCCodes(message));
         info.setUrls(extractURLs(message));
         info.setEmails(extractEmails(message));
+
+        // Extract suspicious keywords using ScamDetector
+        info.setSuspiciousKeywords(scamDetector.extractSuspiciousKeywords(message));
 
         logExtractedInfo(info);
         return info;
