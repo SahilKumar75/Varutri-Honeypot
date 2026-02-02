@@ -2,6 +2,8 @@ package com.varutri.honeypot.service;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.varutri.honeypot.dto.ChatRequest;
+import com.varutri.honeypot.dto.PhishingDetectionResponse;
+import com.varutri.honeypot.dto.PhishingDetectionResult;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,39 +18,60 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Service for communicating with Hugging Face Inference API
+ * Service for communicating with Hugging Face APIs
+ * - Chat Completions API for LLM responses
+ * - Inference API for phishing detection
  */
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "llm.provider", havingValue = "huggingface")
 public class HuggingFaceService {
 
-    private final WebClient webClient;
+    private final WebClient chatWebClient;
+    private final WebClient inferenceWebClient;
     private final String model;
+    private final String phishingModel;
 
     public HuggingFaceService(
             @Value("${huggingface.api-key}") String apiKey,
-            @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model) {
+            @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model,
+            @Value("${huggingface.phishing-model:cybersectony/phishing-email-detection-distilbert_v2.1}") String phishingModel) {
         this.model = model;
-        this.webClient = WebClient.builder()
+        this.phishingModel = phishingModel;
+
+        // WebClient for Chat Completions API (LLM)
+        this.chatWebClient = WebClient.builder()
                 .baseUrl("https://router.huggingface.co/v1")
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
 
-        log.info("Hugging Face service initialized with model: {}", model);
+        // WebClient for Inference API (Classification models)
+        this.inferenceWebClient = WebClient.builder()
+                .baseUrl("https://api-inference.huggingface.co")
+                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
+                .build();
+
+        log.info("Hugging Face service initialized with chat model: {} and phishing model: {}", model, phishingModel);
     }
 
     /**
      * Generate response using Hugging Face Chat Completions API
+     * 
+     * @param userMessage         User's current message
+     * @param conversationHistory Conversation history
+     * @param scamType            Detected scam type (or UNKNOWN)
+     * @param threatLevel         Detected threat level (0.0 to 1.0)
      */
-    public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
+    public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
         try {
-            ChatCompletionRequest request = buildChatRequest(userMessage, conversationHistory);
+            ChatCompletionRequest request = buildChatRequest(userMessage, conversationHistory, scamType, threatLevel);
 
             log.debug("Sending chat completion request to Hugging Face");
 
-            Mono<ChatCompletionResponse> responseMono = webClient.post()
+            Mono<ChatCompletionResponse> responseMono = chatWebClient.post()
                     .uri("/chat/completions")
                     .bodyValue(request)
                     .retrieve()
@@ -73,10 +96,82 @@ public class HuggingFaceService {
     }
 
     /**
+     * Detect phishing content using the phishing detection model
+     * 
+     * @param text The text to analyze for phishing
+     * @return PhishingDetectionResult with detection outcome
+     */
+    public PhishingDetectionResult detectPhishing(String text) {
+        if (text == null || text.trim().isEmpty()) {
+            return PhishingDetectionResult.unknown();
+        }
+
+        try {
+            log.debug("Sending text to phishing detection model: {}",
+                    text.length() > 100 ? text.substring(0, 100) + "..." : text);
+
+            InferenceRequest request = new InferenceRequest(text);
+
+            Mono<List<List<PhishingDetectionResponse.ClassificationResult>>> responseMono = inferenceWebClient.post()
+                    .uri("/models/" + phishingModel)
+                    .bodyValue(request)
+                    .retrieve()
+                    .bodyToMono(
+                            new org.springframework.core.ParameterizedTypeReference<List<List<PhishingDetectionResponse.ClassificationResult>>>() {
+                            })
+                    .timeout(Duration.ofSeconds(15));
+
+            List<List<PhishingDetectionResponse.ClassificationResult>> responseData = responseMono.block();
+
+            // Wrap in PhishingDetectionResponse for processing
+            PhishingDetectionResponse response = new PhishingDetectionResponse(responseData);
+
+            if (response.getTopResult() != null) {
+                PhishingDetectionResponse.ClassificationResult topResult = response.getTopResult();
+                String label = topResult.getLabel();
+                double score = topResult.getScore();
+
+                log.info("Phishing detection result - Label: {}, Score: {}", label, String.format("%.4f", score));
+
+                if (response.isPhishing()) {
+                    log.warn("PHISHING DETECTED with confidence: {}", String.format("%.2f", score));
+                    return PhishingDetectionResult.phishing(score);
+                } else {
+                    return PhishingDetectionResult.safe(score);
+                }
+            }
+
+            log.warn("Empty or null response from phishing detection model");
+            return PhishingDetectionResult.unknown();
+
+        } catch (Exception e) {
+            log.error("Error calling phishing detection model: {}", e.getMessage());
+            // Return unknown on error - don't let API issues break the flow
+            return PhishingDetectionResult.unknown();
+        }
+    }
+
+    /**
+     * Check if a URL is potentially a phishing URL
+     */
+    public PhishingDetectionResult analyzeUrl(String url, String context) {
+        String analysisText = String.format("Check this URL: %s. Context: %s", url, context);
+        return detectPhishing(analysisText);
+    }
+
+    /**
+     * Analyze an email for phishing indicators
+     */
+    public PhishingDetectionResult analyzeEmail(String emailContent) {
+        return detectPhishing(emailContent);
+    }
+
+    /**
      * Build chat completion request with messages
      */
     private ChatCompletionRequest buildChatRequest(String userMessage,
-            List<ChatRequest.ConversationMessage> conversationHistory) {
+            List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
         ChatCompletionRequest request = new ChatCompletionRequest();
         request.setModel(model);
         request.setMaxTokens(200);
@@ -84,10 +179,21 @@ public class HuggingFaceService {
 
         List<Message> messages = new java.util.ArrayList<>();
 
-        // System message with persona
+        // System message with persona and dynamic context
         Message systemMsg = new Message();
         systemMsg.setRole("system");
-        systemMsg.setContent(getSystemPersona());
+
+        String persona = getSystemPersona();
+
+        // Dynamic context injection for high threats
+        if (threatLevel >= 0.6) {
+            persona += "\n\nSYSTEM ALERT: This user is a suspected scammer (Type: " + scamType + "). " +
+                    "Be extra cautious. Ask for more details. Do NOT give money or bank details yet. " +
+                    "Stall them by acting confused or asking to wait.";
+            log.info("Injected high-threat context into system prompt for scam type: {}", scamType);
+        }
+
+        systemMsg.setContent(persona);
         messages.add(systemMsg);
 
         // Add conversation history
@@ -150,6 +256,15 @@ public class HuggingFaceService {
 
                 Keep responses under 25 words, like real uncle typing slowly on phone.
                 """;
+    }
+
+    // Request DTO for Inference API
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class InferenceRequest {
+        @JsonProperty("inputs")
+        private String inputs;
     }
 
     // Chat Completions API Request/Response classes

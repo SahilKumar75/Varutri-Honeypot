@@ -1,6 +1,8 @@
 package com.varutri.honeypot.service;
 
+import com.varutri.honeypot.dto.PhishingDetectionResult;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -9,10 +11,18 @@ import java.util.List;
 
 /**
  * Service for detecting scam patterns and calculating threat levels
+ * Combines regex-based detection with AI-powered phishing detection
  */
 @Slf4j
 @Service
 public class ScamDetector {
+
+    // Optional HuggingFace service for AI-powered phishing detection
+    @Autowired(required = false)
+    private HuggingFaceService huggingFaceService;
+
+    // Cache for AI detection result to avoid duplicate calls
+    private final ThreadLocal<PhishingDetectionResult> cachedAiResult = new ThreadLocal<>();
 
     // Scam type keywords
     private static final List<String> INVESTMENT_SCAM_KEYWORDS = Arrays.asList(
@@ -44,10 +54,34 @@ public class ScamDetector {
 
     /**
      * Detect scam type based on message content
+     * Uses both regex patterns and AI model for comprehensive detection
      */
     public String detectScamType(String message) {
         String lowerMessage = message.toLowerCase();
 
+        // First, try regex-based detection
+        String regexResult = detectScamTypeByRegex(lowerMessage);
+
+        // If regex found a specific type, return it
+        if (!regexResult.equals("UNKNOWN")) {
+            return regexResult;
+        }
+
+        // If regex didn't find anything, try AI model
+        PhishingDetectionResult aiResult = getAiPhishingResult(message);
+        if (aiResult != null && aiResult.isPhishing() && aiResult.getConfidence() > 0.7) {
+            log.info("AI model detected phishing with confidence: {}",
+                    String.format("%.2f", aiResult.getConfidence()));
+            return "PHISHING_AI_DETECTED";
+        }
+
+        return "UNKNOWN";
+    }
+
+    /**
+     * Regex-based scam type detection
+     */
+    private String detectScamTypeByRegex(String lowerMessage) {
         if (containsKeywords(lowerMessage, INVESTMENT_SCAM_KEYWORDS)) {
             return "INVESTMENT_SCAM";
         } else if (containsKeywords(lowerMessage, LOTTERY_SCAM_KEYWORDS)) {
@@ -59,19 +93,50 @@ public class ScamDetector {
         } else if (containsKeywords(lowerMessage, JOB_SCAM_KEYWORDS)) {
             return "JOB_SCAM";
         }
-
         return "UNKNOWN";
     }
 
     /**
+     * Get AI phishing detection result (cached per request)
+     */
+    private PhishingDetectionResult getAiPhishingResult(String message) {
+        // Check if we have a cached result
+        PhishingDetectionResult cached = cachedAiResult.get();
+        if (cached != null) {
+            return cached;
+        }
+
+        // Call AI service if available
+        if (huggingFaceService != null) {
+            try {
+                PhishingDetectionResult result = huggingFaceService.detectPhishing(message);
+                cachedAiResult.set(result);
+                return result;
+            } catch (Exception e) {
+                log.warn("AI phishing detection failed, falling back to regex only: {}", e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Clear the cached AI result (call after processing a message)
+     */
+    public void clearCache() {
+        cachedAiResult.remove();
+    }
+
+    /**
      * Calculate threat level (0.0 to 1.0)
+     * Combines regex scoring with AI model confidence
      */
     public double calculateThreatLevel(String message) {
         String lowerMessage = message.toLowerCase();
         double threatLevel = 0.0;
 
-        // Base threat from scam type
-        String scamType = detectScamType(message);
+        // Base threat from regex-based scam type detection
+        String scamType = detectScamTypeByRegex(lowerMessage);
         if (!scamType.equals("UNKNOWN")) {
             threatLevel += 0.3;
         }
@@ -103,6 +168,18 @@ public class ScamDetector {
             threatLevel += 0.2;
         }
 
+        // AI model contribution
+        PhishingDetectionResult aiResult = getAiPhishingResult(message);
+        if (aiResult != null && aiResult.isPhishing()) {
+            // Add AI confidence to threat level (weighted at 0.3)
+            double aiContribution = aiResult.getConfidence() * 0.3;
+            threatLevel += aiContribution;
+            log.debug("AI phishing detection added {} to threat level", String.format("%.2f", aiContribution));
+        }
+
+        // Clear cache after calculating
+        clearCache();
+
         return Math.min(threatLevel, 1.0);
     }
 
@@ -130,6 +207,12 @@ public class ScamDetector {
             }
         }
 
+        // Add AI detection indicator if applicable
+        PhishingDetectionResult aiResult = getAiPhishingResult(message);
+        if (aiResult != null && aiResult.isPhishing() && aiResult.getConfidence() > 0.7) {
+            found.add("[AI_PHISHING_DETECTED:" + String.format("%.2f", aiResult.getConfidence()) + "]");
+        }
+
         return found;
     }
 
@@ -145,5 +228,12 @@ public class ScamDetector {
      */
     public boolean shouldTriggerAlert(double threatLevel) {
         return threatLevel >= 0.6; // Alert if 60% or higher threat
+    }
+
+    /**
+     * Check if AI phishing detection is available
+     */
+    public boolean isAiDetectionAvailable() {
+        return huggingFaceService != null;
     }
 }

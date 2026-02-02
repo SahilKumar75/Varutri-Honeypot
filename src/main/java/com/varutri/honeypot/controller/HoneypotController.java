@@ -70,7 +70,7 @@ public class HoneypotController {
             double threatLevel = scamDetector.calculateThreatLevel(userMessage);
 
             if (threatLevel >= 0.6) {
-                log.warn("🚨 HIGH THREAT DETECTED! Session: {}, Type: {}, Level: {}",
+                log.warn("HIGH THREAT DETECTED! Session: {}, Type: {}, Level: {}",
                         sessionId, scamType, String.format("%.2f", threatLevel));
             }
 
@@ -82,7 +82,7 @@ public class HoneypotController {
                     request.getConversationHistory());
 
             // Generate AI response using configured LLM provider
-            String aiResponse = generateResponse(userMessage, conversationHistory);
+            String aiResponse = generateResponse(userMessage, conversationHistory, scamType, threatLevel);
 
             // Update session with AI response
             sessionStore.addMessage(sessionId, "assistant", aiResponse);
@@ -93,16 +93,16 @@ public class HoneypotController {
             // Check if we should trigger final callback
             int turnCount = sessionStore.getTurnCount(sessionId);
             if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
-                log.info("🎯 Session {} reached max turns ({}), triggering final callback", sessionId, turnCount);
+                log.info("Session {} reached max turns ({}), triggering final callback", sessionId, turnCount);
                 sendFinalCallback(sessionId);
             }
 
-            log.info("✅ Response generated for session {} (turn {})", sessionId, turnCount);
+            log.info("Response generated for session {} (turn {})", sessionId, turnCount);
 
             return ResponseEntity.ok(ChatResponse.success(aiResponse));
 
         } catch (Exception e) {
-            log.error("❌ Error processing chat for session {}: {}", sessionId, e.getMessage(), e);
+            log.error("Error processing chat for session {}: {}", sessionId, e.getMessage(), e);
             return ResponseEntity.status(500)
                     .body(ChatResponse.error("Internal server error"));
         }
@@ -142,11 +142,12 @@ public class HoneypotController {
     /**
      * Generate response using configured LLM provider
      */
-    private String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
+    private String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
         if (huggingFaceService != null) {
-            return huggingFaceService.generateResponse(userMessage, conversationHistory);
+            return huggingFaceService.generateResponse(userMessage, conversationHistory, scamType, threatLevel);
         } else if (ollamaService != null) {
-            return ollamaService.generateResponse(userMessage, conversationHistory);
+            return ollamaService.generateResponse(userMessage, conversationHistory, scamType, threatLevel);
         } else {
             throw new IllegalStateException(
                     "No LLM service configured. Please set llm.provider to 'ollama' or 'huggingface'");
@@ -192,7 +193,7 @@ public class HoneypotController {
      */
     @GetMapping("/evidence/{sessionId}")
     public ResponseEntity<?> getEvidence(@PathVariable String sessionId) {
-        log.info("📊 Evidence requested for session: {}", sessionId);
+        log.info("Evidence requested for session: {}", sessionId);
 
         EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
 
@@ -210,7 +211,7 @@ public class HoneypotController {
      */
     @GetMapping("/evidence/high-threat")
     public ResponseEntity<?> getHighThreatEvidence() {
-        log.info("🚨 High-threat evidence requested");
+        log.info("High-threat evidence requested");
         List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getHighThreatEvidence();
         return ResponseEntity.ok(evidence);
     }
@@ -221,7 +222,7 @@ public class HoneypotController {
      */
     @GetMapping("/evidence")
     public ResponseEntity<?> getAllEvidence() {
-        log.info("📊 All evidence requested");
+        log.info("All evidence requested");
         List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getAllEvidence();
         return ResponseEntity.ok(evidence);
     }

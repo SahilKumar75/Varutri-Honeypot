@@ -39,9 +39,10 @@ public class OllamaService {
     /**
      * Generate response using Ollama
      */
-    public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
+    public String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
         try {
-            String prompt = buildPrompt(userMessage, conversationHistory);
+            String prompt = buildPrompt(userMessage, conversationHistory, scamType, threatLevel);
 
             OllamaRequest request = new OllamaRequest();
             request.setModel(model);
@@ -78,11 +79,20 @@ public class OllamaService {
     /**
      * Build prompt with persona and conversation context
      */
-    private String buildPrompt(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory) {
+    private String buildPrompt(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
         StringBuilder prompt = new StringBuilder();
 
         // System persona
-        prompt.append(getSystemPersona()).append("\n\n");
+        prompt.append(getSystemPersona());
+
+        // Dynamic context for Ollama
+        if (threatLevel >= 0.6) {
+            prompt.append("\n\nSYSTEM ALERT: This user is a suspected scammer (Type: ").append(scamType).append("). ")
+                    .append("Be extra cautious. Stall them. Do NOT give money yet.");
+        }
+
+        prompt.append("\n\n");
 
         // Conversation history
         if (conversationHistory != null && !conversationHistory.isEmpty()) {

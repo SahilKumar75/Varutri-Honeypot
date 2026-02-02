@@ -126,22 +126,22 @@ public class InformationExtractor {
      */
     private void logExtractedInfo(ExtractedInfo info) {
         if (!info.getUpiIds().isEmpty()) {
-            log.warn("🚨 Extracted UPI IDs: {}", info.getUpiIds());
+            log.warn("Extracted UPI IDs: {}", info.getUpiIds());
         }
         if (!info.getPhoneNumbers().isEmpty()) {
-            log.warn("📱 Extracted Phone Numbers: {}", info.getPhoneNumbers());
+            log.warn("Extracted Phone Numbers: {}", info.getPhoneNumbers());
         }
         if (!info.getBankAccountNumbers().isEmpty()) {
-            log.warn("🏦 Extracted Bank Accounts: {}", info.getBankAccountNumbers());
+            log.warn("Extracted Bank Accounts: {}", info.getBankAccountNumbers());
         }
         if (!info.getIfscCodes().isEmpty()) {
-            log.warn("🏛️ Extracted IFSC Codes: {}", info.getIfscCodes());
+            log.warn("Extracted IFSC Codes: {}", info.getIfscCodes());
         }
         if (!info.getUrls().isEmpty()) {
-            log.warn("🔗 Extracted URLs: {}", info.getUrls());
+            log.warn("Extracted URLs: {}", info.getUrls());
         }
         if (!info.getEmails().isEmpty()) {
-            log.warn("📧 Extracted Emails: {}", info.getEmails());
+            log.warn("Extracted Emails: {}", info.getEmails());
         }
     }
 }
