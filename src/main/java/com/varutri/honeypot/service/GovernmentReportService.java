@@ -2,8 +2,10 @@ package com.varutri.honeypot.service;
 
 import com.varutri.honeypot.dto.ExtractedInfo;
 import com.varutri.honeypot.dto.ScamReport;
+import com.varutri.honeypot.entity.ScamReportEntity;
+import com.varutri.honeypot.repository.ScamReportRepository;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -12,29 +14,27 @@ import java.io.FileWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * Service for reporting scams to government authorities
+ * Now uses MongoDB for persistent report storage
  */
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class GovernmentReportService {
 
-    @Autowired
-    private EvidenceCollector evidenceCollector;
+    private final EvidenceCollector evidenceCollector;
+    private final ScamReportRepository scamReportRepository;
 
     @Value("${government.report.auto-threshold:0.7}")
     private double autoReportThreshold;
 
     @Value("${government.report.email:report@cybercrime.gov.in}")
     private String reportEmail;
-
-    // In-memory report storage (in production, use database)
-    private final Map<String, ScamReport> reportArchive = new HashMap<>();
 
     /**
      * Check if session should trigger automatic report
@@ -242,26 +242,115 @@ public class GovernmentReportService {
     }
 
     /**
-     * Archive report for audit trail
+     * Archive report for audit trail (persisted to MongoDB)
      */
     public void archiveReport(ScamReport report) {
-        report.setStatus(ScamReport.ReportStatus.ARCHIVED);
-        reportArchive.put(report.getReportId(), report);
-        log.info("📦 Report {} archived", report.getReportId());
+        try {
+            // Convert to entity
+            ScamReportEntity entity = ScamReportEntity.builder()
+                    .reportId(report.getReportId())
+                    .sessionId(report.getSessionId())
+                    .timestamp(report.getTimestamp())
+                    .scamType(report.getScamType())
+                    .threatLevel(report.getThreatLevel())
+                    .totalMessages(report.getTotalMessages())
+                    .upiIds(new ArrayList<>(report.getUpiIds()))
+                    .bankAccounts(new ArrayList<>(report.getBankAccounts()))
+                    .ifscCodes(new ArrayList<>(report.getIfscCodes()))
+                    .phoneNumbers(new ArrayList<>(report.getPhoneNumbers()))
+                    .urls(new ArrayList<>(report.getUrls()))
+                    .suspiciousKeywords(new ArrayList<>(report.getSuspiciousKeywords()))
+                    .victimProfile(report.getVictimProfile())
+                    .reportedBy(report.getReportedBy())
+                    .status(ScamReportEntity.ReportStatus.valueOf(report.getStatus().name()))
+                    .build();
+
+            // Convert conversation
+            if (report.getConversation() != null) {
+                List<ScamReportEntity.ConversationTurn> turns = report.getConversation().stream()
+                        .map(turn -> ScamReportEntity.ConversationTurn.builder()
+                                .timestamp(turn.getTimestamp())
+                                .sender(turn.getSender())
+                                .message(turn.getMessage())
+                                .build())
+                        .toList();
+                entity.setConversation(turns);
+            }
+
+            scamReportRepository.save(entity);
+            log.info("📦 Report {} archived to MongoDB", report.getReportId());
+
+        } catch (Exception e) {
+            log.error("Failed to archive report to MongoDB {}: {}", report.getReportId(), e.getMessage());
+        }
     }
 
     /**
-     * Get archived report
+     * Get archived report (from MongoDB)
      */
     public ScamReport getReport(String reportId) {
-        return reportArchive.get(reportId);
+        Optional<ScamReportEntity> entity = scamReportRepository.findByReportId(reportId);
+        return entity.map(this::entityToScamReport).orElse(null);
     }
 
     /**
-     * Get all archived reports
+     * Get all archived reports (from MongoDB)
      */
     public List<ScamReport> getAllReports() {
-        return new ArrayList<>(reportArchive.values());
+        return scamReportRepository.findAll().stream()
+                .map(this::entityToScamReport)
+                .toList();
+    }
+
+    /**
+     * Get total report count
+     */
+    public long getTotalReportCount() {
+        return scamReportRepository.count();
+    }
+
+    /**
+     * Get high-threat reports
+     */
+    public List<ScamReport> getHighThreatReports() {
+        return scamReportRepository.findByThreatLevelGreaterThanEqual(0.7).stream()
+                .map(this::entityToScamReport)
+                .toList();
+    }
+
+    /**
+     * Convert MongoDB entity to ScamReport DTO
+     */
+    private ScamReport entityToScamReport(ScamReportEntity entity) {
+        List<ScamReport.ConversationTurn> conversation = new ArrayList<>();
+        if (entity.getConversation() != null) {
+            conversation = entity.getConversation().stream()
+                    .map(turn -> ScamReport.ConversationTurn.builder()
+                            .timestamp(turn.getTimestamp())
+                            .sender(turn.getSender())
+                            .message(turn.getMessage())
+                            .build())
+                    .toList();
+        }
+
+        return ScamReport.builder()
+                .reportId(entity.getReportId())
+                .sessionId(entity.getSessionId())
+                .timestamp(entity.getTimestamp())
+                .scamType(entity.getScamType())
+                .threatLevel(entity.getThreatLevel())
+                .totalMessages(entity.getTotalMessages())
+                .upiIds(entity.getUpiIds())
+                .bankAccounts(entity.getBankAccounts())
+                .ifscCodes(entity.getIfscCodes())
+                .phoneNumbers(entity.getPhoneNumbers())
+                .urls(entity.getUrls())
+                .suspiciousKeywords(entity.getSuspiciousKeywords())
+                .conversation(conversation)
+                .victimProfile(entity.getVictimProfile())
+                .reportedBy(entity.getReportedBy())
+                .status(ScamReport.ReportStatus.valueOf(entity.getStatus().name()))
+                .build();
     }
 
     /**

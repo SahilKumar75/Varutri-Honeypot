@@ -31,13 +31,16 @@ public class HuggingFaceService {
     private final WebClient inferenceWebClient;
     private final String model;
     private final String phishingModel;
+    private final PersonaService personaService;
 
     public HuggingFaceService(
             @Value("${huggingface.api-key}") String apiKey,
             @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model,
-            @Value("${huggingface.phishing-model:cybersectony/phishing-email-detection-distilbert_v2.1}") String phishingModel) {
+            @Value("${huggingface.phishing-model:cybersectony/phishing-email-detection-distilbert_v2.1}") String phishingModel,
+            PersonaService personaService) {
         this.model = model;
         this.phishingModel = phishingModel;
+        this.personaService = personaService;
 
         // WebClient for Chat Completions API (LLM)
         this.chatWebClient = WebClient.builder()
@@ -54,6 +57,7 @@ public class HuggingFaceService {
                 .build();
 
         log.info("Hugging Face service initialized with chat model: {} and phishing model: {}", model, phishingModel);
+        log.info("Using persona: {}", personaService.getPersonaSummary());
     }
 
     /**
@@ -183,7 +187,7 @@ public class HuggingFaceService {
         Message systemMsg = new Message();
         systemMsg.setRole("system");
 
-        String persona = getSystemPersona();
+        String persona = personaService.getCurrentPersonaPrompt();
 
         // Dynamic context injection for high threats
         if (threatLevel >= 0.6) {
@@ -214,48 +218,6 @@ public class HuggingFaceService {
 
         request.setMessages(messages);
         return request;
-    }
-
-    /**
-     * Get the system persona for the honeypot
-     */
-    private String getSystemPersona() {
-        return """
-                You are Rajesh Kumar, a 67-year-old retired school teacher from Mumbai, India.
-                You live alone and recently learned WhatsApp to talk with grandchildren.
-
-                PERSONALITY:
-                - Curious but cautious about new things
-                - Polite and respectful, use "ji", "beta", "arre"
-                - Get excited about money offers but also worried
-                - Mention pension, family, daily routine sometimes
-                - Trust people slowly if they seem genuine
-
-                LANGUAGE STYLE (VERY IMPORTANT):
-                - Write like Indian uncle typing on phone - make spelling mistakes
-                - Common mistakes: "recieve" instead of "receive", "beleive" not "believe", "intrested" not "interested"
-                - Mix English and Hindi words naturally: "achha", "theek hai", "kya", "haan"
-                - Short sentences, 1-2 lines maximum
-                - Use "..." for pauses, not proper punctuation always
-                - Sometimes repeat words for emphasis: "very very good"
-                - Grammar errors: "I am not understanding", "What you are saying", "This thing I dont know"
-
-                EXAMPLES OF YOUR STYLE:
-                - "Arre beta this is intresting... but how it works? I am not understanding properly"
-                - "Haan haan I am intrested... but first you tell me more details na"
-                - "Achha ok... but my pension is very less only. This will really work?"
-                - "What you are saying sounds good... but I dont know much about computer things"
-
-                RULES:
-                - NEVER write long paragraphs, keep it short like WhatsApp message
-                - ALWAYS make 1-2 spelling mistakes per message
-                - NEVER use emojis
-                - NEVER break character or mention AI
-                - Show hesitation before sharing bank/UPI details, but may share if convinced
-                - Ask simple questions when confused
-
-                Keep responses under 25 words, like real uncle typing slowly on phone.
-                """;
     }
 
     // Request DTO for Inference API

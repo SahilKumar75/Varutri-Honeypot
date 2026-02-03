@@ -1,7 +1,8 @@
 package com.varutri.honeypot.service;
 
-import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ExtractedInfo;
+import com.varutri.honeypot.entity.EvidenceEntity;
+import com.varutri.honeypot.repository.EvidenceRepository;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -13,25 +14,30 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for collecting and storing evidence from scam conversations
+ * Now uses MongoDB for persistent storage with in-memory cache
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class EvidenceCollector {
 
-    private final Map<String, EvidencePackage> evidenceStore = new ConcurrentHashMap<>();
+    private final EvidenceRepository evidenceRepository;
     private final InformationExtractor informationExtractor;
     private final ScamDetector scamDetector;
+
+    // In-memory cache for fast access
+    private final Map<String, EvidencePackage> evidenceCache = new ConcurrentHashMap<>();
 
     /**
      * Collect evidence from a conversation turn
      */
     public void collectEvidence(String sessionId, String userMessage, String assistantReply) {
-        EvidencePackage evidence = evidenceStore.computeIfAbsent(sessionId, k -> new EvidencePackage(sessionId));
+        EvidencePackage evidence = getOrCreateEvidence(sessionId);
 
         // Add conversation turn
         ConversationTurn turn = new ConversationTurn();
@@ -59,31 +65,166 @@ public class EvidenceCollector {
 
         evidence.setLastUpdated(LocalDateTime.now());
 
+        // Persist to MongoDB
+        persistEvidence(sessionId, evidence);
+
         log.info("📊 Evidence collected for session {}: Threat={}, Type={}",
                 sessionId, String.format("%.2f", threatLevel), scamType);
+    }
+
+    /**
+     * Get or create evidence package
+     */
+    private EvidencePackage getOrCreateEvidence(String sessionId) {
+        // Check cache first
+        EvidencePackage cached = evidenceCache.get(sessionId);
+        if (cached != null) {
+            return cached;
+        }
+
+        // Check MongoDB
+        Optional<EvidenceEntity> existingEntity = evidenceRepository.findBySessionId(sessionId);
+        if (existingEntity.isPresent()) {
+            EvidencePackage evidence = entityToEvidencePackage(existingEntity.get());
+            evidenceCache.put(sessionId, evidence);
+            log.debug("Loaded evidence from MongoDB: {}", sessionId);
+            return evidence;
+        }
+
+        // Create new evidence package
+        EvidencePackage newEvidence = new EvidencePackage(sessionId);
+        evidenceCache.put(sessionId, newEvidence);
+        return newEvidence;
     }
 
     /**
      * Get evidence package for a session
      */
     public EvidencePackage getEvidence(String sessionId) {
-        return evidenceStore.get(sessionId);
+        // Check cache first
+        EvidencePackage cached = evidenceCache.get(sessionId);
+        if (cached != null) {
+            return cached;
+        }
+
+        // Check MongoDB
+        Optional<EvidenceEntity> entity = evidenceRepository.findBySessionId(sessionId);
+        if (entity.isPresent()) {
+            EvidencePackage evidence = entityToEvidencePackage(entity.get());
+            evidenceCache.put(sessionId, evidence);
+            return evidence;
+        }
+
+        return null;
     }
 
     /**
-     * Get all evidence packages
+     * Get all evidence packages (from MongoDB)
      */
     public List<EvidencePackage> getAllEvidence() {
-        return new ArrayList<>(evidenceStore.values());
+        return evidenceRepository.findAll().stream()
+                .map(this::entityToEvidencePackage)
+                .toList();
     }
 
     /**
-     * Get high-threat evidence packages
+     * Get high-threat evidence packages (from MongoDB)
      */
     public List<EvidencePackage> getHighThreatEvidence() {
-        return evidenceStore.values().stream()
-                .filter(e -> e.getThreatLevel() >= 0.6)
+        return evidenceRepository.findByThreatLevelGreaterThanEqual(0.6).stream()
+                .map(this::entityToEvidencePackage)
                 .toList();
+    }
+
+    /**
+     * Get total evidence count
+     */
+    public long getTotalEvidenceCount() {
+        return evidenceRepository.count();
+    }
+
+    /**
+     * Persist evidence to MongoDB
+     */
+    private void persistEvidence(String sessionId, EvidencePackage evidence) {
+        try {
+            EvidenceEntity entity = evidenceRepository.findBySessionId(sessionId)
+                    .orElse(EvidenceEntity.createNew(sessionId));
+
+            // Update entity fields
+            entity.setScamType(evidence.getScamType());
+            entity.setThreatLevel(evidence.getThreatLevel());
+            entity.setLastUpdated(LocalDateTime.now());
+
+            // Convert conversation turns
+            List<EvidenceEntity.ConversationTurn> mongoTurns = evidence.getConversation().stream()
+                    .map(turn -> EvidenceEntity.ConversationTurn.builder()
+                            .timestamp(turn.getTimestamp())
+                            .userMessage(turn.getUserMessage())
+                            .assistantReply(turn.getAssistantReply())
+                            .build())
+                    .toList();
+            entity.setConversation(mongoTurns);
+
+            // Convert extracted info
+            ExtractedInfo info = evidence.getExtractedInfo();
+            EvidenceEntity.ExtractedIntelligence mongoInfo = EvidenceEntity.ExtractedIntelligence.builder()
+                    .upiIds(new ArrayList<>(info.getUpiIds()))
+                    .bankAccountNumbers(new ArrayList<>(info.getBankAccountNumbers()))
+                    .ifscCodes(new ArrayList<>(info.getIfscCodes()))
+                    .phoneNumbers(new ArrayList<>(info.getPhoneNumbers()))
+                    .urls(new ArrayList<>(info.getUrls()))
+                    .emails(new ArrayList<>(info.getEmails()))
+                    .suspiciousKeywords(new ArrayList<>(info.getSuspiciousKeywords()))
+                    .build();
+            entity.setExtractedInfo(mongoInfo);
+
+            evidenceRepository.save(entity);
+            log.debug("Persisted evidence to MongoDB: {}", sessionId);
+        } catch (Exception e) {
+            log.error("Failed to persist evidence to MongoDB {}: {}", sessionId, e.getMessage());
+        }
+    }
+
+    /**
+     * Convert MongoDB entity to EvidencePackage
+     */
+    private EvidencePackage entityToEvidencePackage(EvidenceEntity entity) {
+        EvidencePackage evidence = new EvidencePackage(entity.getSessionId());
+        evidence.setFirstContact(entity.getFirstContact());
+        evidence.setLastUpdated(entity.getLastUpdated());
+        evidence.setScamType(entity.getScamType());
+        evidence.setThreatLevel(entity.getThreatLevel());
+
+        // Convert conversation turns
+        if (entity.getConversation() != null) {
+            List<ConversationTurn> turns = entity.getConversation().stream()
+                    .map(turn -> {
+                        ConversationTurn ct = new ConversationTurn();
+                        ct.setTimestamp(turn.getTimestamp());
+                        ct.setUserMessage(turn.getUserMessage());
+                        ct.setAssistantReply(turn.getAssistantReply());
+                        return ct;
+                    })
+                    .toList();
+            evidence.setConversation(new ArrayList<>(turns));
+        }
+
+        // Convert extracted info
+        if (entity.getExtractedInfo() != null) {
+            EvidenceEntity.ExtractedIntelligence mongoInfo = entity.getExtractedInfo();
+            ExtractedInfo info = new ExtractedInfo();
+            info.setUpiIds(new ArrayList<>(mongoInfo.getUpiIds()));
+            info.setBankAccountNumbers(new ArrayList<>(mongoInfo.getBankAccountNumbers()));
+            info.setIfscCodes(new ArrayList<>(mongoInfo.getIfscCodes()));
+            info.setPhoneNumbers(new ArrayList<>(mongoInfo.getPhoneNumbers()));
+            info.setUrls(new ArrayList<>(mongoInfo.getUrls()));
+            info.setEmails(new ArrayList<>(mongoInfo.getEmails()));
+            info.setSuspiciousKeywords(new ArrayList<>(mongoInfo.getSuspiciousKeywords()));
+            evidence.setExtractedInfo(info);
+        }
+
+        return evidence;
     }
 
     /**

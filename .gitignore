@@ -41,3 +41,8 @@ logs/
 ### Environment ###
 .env
 .env.local
+.env.*.local
+*.env
+
+### Reports (may contain sensitive scam data) ###
+reports/

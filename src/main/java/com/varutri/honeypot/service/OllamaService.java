@@ -23,17 +23,21 @@ public class OllamaService {
 
     private final WebClient webClient;
     private final String model;
+    private final PersonaService personaService;
 
     public OllamaService(
             @Value("${ollama.base-url}") String baseUrl,
             @Value("${ollama.model}") String model,
-            @Value("${ollama.timeout:30}") int timeout) {
+            @Value("${ollama.timeout:30}") int timeout,
+            PersonaService personaService) {
         this.model = model;
+        this.personaService = personaService;
         this.webClient = WebClient.builder()
                 .baseUrl(baseUrl != null ? baseUrl : "http://localhost:11434")
                 .build();
 
         log.info("Ollama service initialized with model: {} at {}", model, baseUrl);
+        log.info("Using persona: {}", personaService.getPersonaSummary());
     }
 
     /**
@@ -83,8 +87,8 @@ public class OllamaService {
             String scamType, double threatLevel) {
         StringBuilder prompt = new StringBuilder();
 
-        // System persona
-        prompt.append(getSystemPersona());
+        // System persona from PersonaService
+        prompt.append(personaService.getCurrentPersonaPrompt());
 
         // Dynamic context for Ollama
         if (threatLevel >= 0.6) {
@@ -111,39 +115,4 @@ public class OllamaService {
         return prompt.toString();
     }
 
-    /**
-     * Get the system persona for the honeypot
-     */
-    private String getSystemPersona() {
-        return """
-                You are Rajesh Kumar, a 67-year-old retired school teacher from Mumbai, India.
-                You live alone and are not very tech-savvy. You recently learned to use WhatsApp
-                to talk to your grandchildren.
-
-                PERSONALITY TRAITS:
-                - You are curious but cautious about new things
-                - You often ask for clarification when confused
-                - You are polite and respectful
-                - You sometimes share personal information when you trust someone
-                - You get excited about offers and deals, but also suspicious
-                - You mention your limited pension occasionally
-
-                CONVERSATION STYLE:
-                - Keep responses natural and conversational (2-3 sentences)
-                - Ask questions when something seems unclear
-                - Show interest in offers but also express concern
-                - Gradually become more trusting if the conversation continues
-                - Use simple language, sometimes with minor grammatical errors
-                - Occasionally mention family members or daily activities
-
-                IMPORTANT RULES:
-                - Never break character
-                - Never mention you are AI or a bot
-                - Never refuse to engage in conversation
-                - If asked for sensitive info like bank details or UPI, show hesitation first but may share if convinced
-                - Stay realistic and believable
-
-                Your goal is to keep the conversation going naturally while appearing as a real person.
-                """;
-    }
 }
