@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -14,9 +15,11 @@ import java.io.IOException;
 
 /**
  * Security filter to validate API key in request headers
+ * Runs after RateLimitFilter (Order 1)
  */
 @Slf4j
 @Component
+@Order(2) // Run after RateLimitFilter (which is Order 1)
 public class ApiKeyFilter extends OncePerRequestFilter {
 
     @Value("${varutri.api-key}")

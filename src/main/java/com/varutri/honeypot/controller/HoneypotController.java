@@ -15,6 +15,7 @@ import java.util.List;
 
 /**
  * Main REST controller for honeypot chat API
+ * Includes input validation and sanitization for security
  */
 @Slf4j
 @RestController
@@ -45,24 +46,37 @@ public class HoneypotController {
     @Autowired
     private GovernmentReportService governmentReportService;
 
+    @Autowired
+    private InputSanitizer inputSanitizer;
+
     @Value("${varutri.session.max-turns:20}")
     private int maxTurns;
 
     /**
      * Main chat endpoint
      * POST /api/chat
+     * Input is validated via @Valid annotation
      */
     @PostMapping("/chat")
     public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
-        String sessionId = request.getSessionId();
+        // Sanitize session ID for safe database queries
+        String sessionId = inputSanitizer.sanitizeSessionId(request.getSessionId());
 
-        // Extract text from nested message object (GUVI format)
+        // Get message text (already validated by @Valid)
         String userMessage = request.getMessage().getText();
         String sender = request.getMessage().getSender();
 
-        log.info("Received message for session {}: {} from {}", sessionId,
-                userMessage.length() > 50 ? userMessage.substring(0, 50) + "..." : userMessage,
+        // Log with sanitized output to prevent log injection
+        log.info("Received message for session {}: {} from {}",
+                sessionId,
+                inputSanitizer.sanitizeForLogging(userMessage),
                 sender);
+
+        // Check for potential prompt injection (log but don't block - honeypot should
+        // engage)
+        if (inputSanitizer.containsPromptInjection(userMessage)) {
+            log.warn("⚠️ Potential prompt injection detected in session {}", sessionId);
+        }
 
         try {
             // Extract intelligence from user message
