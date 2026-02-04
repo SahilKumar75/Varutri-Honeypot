@@ -1,4 +1,5 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.core;
+import com.varutri.honeypot.service.data.EvidenceCollector;
 
 import com.varutri.honeypot.dto.ExtractedInfo;
 import com.varutri.honeypot.dto.ScamReport;
@@ -365,3 +366,4 @@ public class GovernmentReportService {
         }
     }
 }
+

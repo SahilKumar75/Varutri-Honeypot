@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.security;
 
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
@@ -188,3 +188,4 @@ public class RateLimitService {
                 "cleanupIntervalMinutes", cleanupIntervalMinutes);
     }
 }
+

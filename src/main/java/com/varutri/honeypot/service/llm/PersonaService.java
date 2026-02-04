@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.llm;
 
 import com.varutri.honeypot.dto.PersonaProfile;
 import jakarta.annotation.PostConstruct;
@@ -167,3 +167,4 @@ public class PersonaService {
                 currentPersona.getCountry());
     }
 }
+

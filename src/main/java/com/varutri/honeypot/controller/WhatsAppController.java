@@ -4,12 +4,12 @@ import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.WhatsAppWebhook;
-import com.varutri.honeypot.service.HuggingFaceService;
-import com.varutri.honeypot.service.OllamaService;
-import com.varutri.honeypot.service.SessionStore;
-import com.varutri.honeypot.service.WhatsAppService;
-import com.varutri.honeypot.service.EvidenceCollector;
-import com.varutri.honeypot.service.InformationExtractor;
+import com.varutri.honeypot.service.llm.HuggingFaceService;
+import com.varutri.honeypot.service.llm.OllamaService;
+import com.varutri.honeypot.service.data.SessionStore;
+import com.varutri.honeypot.service.core.WhatsAppService;
+import com.varutri.honeypot.service.data.EvidenceCollector;
+import com.varutri.honeypot.service.ai.InformationExtractor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -302,3 +302,4 @@ public class WhatsAppController {
         return ApiResponse.ok(sessionInfo, "Session retrieved successfully");
     }
 }
+

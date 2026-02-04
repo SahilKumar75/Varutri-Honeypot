@@ -1,4 +1,5 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
+import com.varutri.honeypot.service.llm.HuggingFaceService;
 
 import com.varutri.honeypot.dto.PhishingDetectionResult;
 import lombok.extern.slf4j.Slf4j;
@@ -392,3 +393,4 @@ public class ScamDetector {
         return huggingFaceService != null;
     }
 }
+

@@ -1,4 +1,5 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
+import com.varutri.honeypot.service.llm.PersonaService;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -660,3 +661,4 @@ public class ResponseValidationService {
         }
     }
 }
+

@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
 
 import com.varutri.honeypot.dto.ExtractedInfo;
 import lombok.extern.slf4j.Slf4j;
@@ -152,3 +152,4 @@ public class InformationExtractor {
         }
     }
 }
+

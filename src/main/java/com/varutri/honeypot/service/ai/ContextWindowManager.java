@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ExtractedInfo;
@@ -513,3 +513,4 @@ public class ContextWindowManager {
         boolean wasTruncated;
     }
 }
+

@@ -1,6 +1,6 @@
 package com.varutri.honeypot.dto;
 
-import com.varutri.honeypot.service.EnsembleThreatScorer;
+import com.varutri.honeypot.service.ai.EnsembleThreatScorer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -129,3 +129,4 @@ public class ThreatAssessmentResponse {
         private int evidenceCount;
     }
 }
+

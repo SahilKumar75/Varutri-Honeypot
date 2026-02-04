@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.data;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.entity.SessionEntity;
@@ -198,3 +198,4 @@ public class SessionStore {
         }
     }
 }
+

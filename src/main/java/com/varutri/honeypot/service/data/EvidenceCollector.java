@@ -1,4 +1,7 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.data;
+import com.varutri.honeypot.service.ai.InformationExtractor;
+import com.varutri.honeypot.service.ai.ScamDetector;
+import com.varutri.honeypot.service.ai.EnsembleThreatScorer;
 
 import com.varutri.honeypot.dto.ExtractedInfo;
 import com.varutri.honeypot.entity.EvidenceEntity;
@@ -344,3 +347,4 @@ public class EvidenceCollector {
         private String assistantReply;
     }
 }
+

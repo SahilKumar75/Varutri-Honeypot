@@ -1,4 +1,5 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
+import com.varutri.honeypot.service.llm.HuggingFaceService;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.varutri.honeypot.dto.ChatRequest;
@@ -630,3 +631,4 @@ public class SemanticScamAnalyzer {
         public String error;
     }
 }
+

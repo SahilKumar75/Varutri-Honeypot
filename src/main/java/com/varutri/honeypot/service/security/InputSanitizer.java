@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.security;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -199,3 +199,4 @@ public class InputSanitizer {
                 sanitizeForLogging(input));
     }
 }
+

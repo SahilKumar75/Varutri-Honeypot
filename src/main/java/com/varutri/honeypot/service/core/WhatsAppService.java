@@ -1,4 +1,4 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.core;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -145,3 +145,4 @@ public class WhatsAppService {
         sendMessage(userPhone, message);
     }
 }
+

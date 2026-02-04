@@ -1,7 +1,7 @@
 package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.dto.PersonaProfile;
-import com.varutri.honeypot.service.PersonaService;
+import com.varutri.honeypot.service.llm.PersonaService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -237,3 +237,4 @@ public class PersonaController {
         return ResponseEntity.ok(response);
     }
 }
+

@@ -1,4 +1,13 @@
 package com.varutri.honeypot.controller;
+import com.varutri.honeypot.service.security.InputSanitizer;
+import com.varutri.honeypot.service.llm.OllamaService;
+import com.varutri.honeypot.service.core.GovernmentReportService;
+import com.varutri.honeypot.service.data.SessionStore;
+import com.varutri.honeypot.service.core.CallbackService;
+import com.varutri.honeypot.service.ai.InformationExtractor;
+import com.varutri.honeypot.service.ai.EnsembleThreatScorer;
+import com.varutri.honeypot.service.llm.HuggingFaceService;
+import com.varutri.honeypot.service.data.EvidenceCollector;
 
 import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
@@ -6,7 +15,7 @@ import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.ExtractedInfo;
 import com.varutri.honeypot.dto.ThreatAssessmentResponse;
 import com.varutri.honeypot.exception.ResourceNotFoundException;
-import com.varutri.honeypot.service.*;
+
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,15 +69,6 @@ public class HoneypotController {
     @Value("${llm.provider:huggingface}")
     private String llmProvider;
 
-    /**
-     * Main chat endpoint
-     * POST /api/chat
-     * 
-     * @return 200 OK with chat response on success
-     * @return 400 Bad Request on validation errors
-     * @return 503 Service Unavailable if LLM fails
-     */
-    @PostMapping("/chat")
     /**
      * Main chat endpoint (Asynchronous)
      * POST /api/chat
@@ -374,3 +374,4 @@ public class HoneypotController {
         }
     }
 }
+

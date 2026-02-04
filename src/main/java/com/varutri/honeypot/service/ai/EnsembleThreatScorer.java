@@ -1,4 +1,6 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
+
+import com.varutri.honeypot.service.llm.HuggingFaceService;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.PhishingDetectionResult;
@@ -367,7 +369,7 @@ public class EnsembleThreatScorer {
 
         try {
             SemanticScamAnalyzer.SemanticAnalysisResult semanticResult = semanticScamAnalyzer
-                    .analyzeMessage(normalizedMessage, history);
+                    .analyzeMessage(normalizedMessage, history).join();
 
             result.rawScore = semanticResult.combinedScore;
             result.triggered = semanticResult.hasSignificantMatch();

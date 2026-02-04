@@ -1,4 +1,5 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.ai;
+import com.varutri.honeypot.service.data.EvidenceCollector;
 
 import com.varutri.honeypot.dto.*;
 import lombok.extern.slf4j.Slf4j;
@@ -215,3 +216,4 @@ public class ScamSimulator {
         return summary.toString();
     }
 }
+

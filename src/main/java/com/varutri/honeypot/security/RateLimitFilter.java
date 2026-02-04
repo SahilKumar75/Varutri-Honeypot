@@ -1,7 +1,7 @@
 package com.varutri.honeypot.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.varutri.honeypot.service.RateLimitService;
+import com.varutri.honeypot.service.security.RateLimitService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -131,3 +131,4 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 clientId.substring(0, Math.min(clientId.length(), 10)) + "...");
     }
 }
+

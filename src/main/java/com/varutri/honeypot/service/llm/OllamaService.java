@@ -1,4 +1,7 @@
-package com.varutri.honeypot.service;
+package com.varutri.honeypot.service.llm;
+import com.varutri.honeypot.service.ai.PromptHardeningService;
+import com.varutri.honeypot.service.ai.ResponseValidationService;
+import com.varutri.honeypot.service.ai.ContextWindowManager;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.OllamaRequest;
@@ -330,3 +333,4 @@ public class OllamaService {
         return 0;
     }
 }
+
