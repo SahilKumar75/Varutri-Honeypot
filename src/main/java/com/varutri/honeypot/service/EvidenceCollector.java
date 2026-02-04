@@ -6,8 +6,8 @@ import com.varutri.honeypot.repository.EvidenceRepository;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,22 +19,36 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for collecting and storing evidence from scam conversations
- * Now uses MongoDB for persistent storage with in-memory cache
+ * Uses MongoDB for persistent storage with in-memory cache
+ * 
+ * Now uses EnsembleThreatScorer for unified threat detection
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EvidenceCollector {
 
     private final EvidenceRepository evidenceRepository;
     private final InformationExtractor informationExtractor;
-    private final ScamDetector scamDetector;
+    private final ScamDetector scamDetector; // Only used for extractSuspiciousKeywords()
+    private final EnsembleThreatScorer ensembleThreatScorer; // Unified threat scoring
 
     // In-memory cache for fast access
     private final Map<String, EvidencePackage> evidenceCache = new ConcurrentHashMap<>();
 
+    @Autowired
+    public EvidenceCollector(EvidenceRepository evidenceRepository,
+            InformationExtractor informationExtractor,
+            ScamDetector scamDetector,
+            EnsembleThreatScorer ensembleThreatScorer) {
+        this.evidenceRepository = evidenceRepository;
+        this.informationExtractor = informationExtractor;
+        this.scamDetector = scamDetector;
+        this.ensembleThreatScorer = ensembleThreatScorer;
+    }
+
     /**
      * Collect evidence from a conversation turn
+     * Uses EnsembleThreatScorer for unified threat detection
      */
     public void collectEvidence(String sessionId, String userMessage, String assistantReply) {
         EvidencePackage evidence = getOrCreateEvidence(sessionId);
@@ -52,24 +66,42 @@ public class EvidenceCollector {
         // Merge extracted info
         mergeExtractedInfo(evidence.getExtractedInfo(), extracted);
 
-        // Update scam analysis
-        String scamType = scamDetector.detectScamType(userMessage);
-        double threatLevel = scamDetector.calculateThreatLevel(userMessage);
+        // === UNIFIED ENSEMBLE THREAT SCORING ===
+        EnsembleThreatScorer.ThreatAssessment assessment = ensembleThreatScorer.assessThreat(userMessage, null);
+
+        // Extract keywords using ScamDetector (lightweight operation)
         List<String> keywords = scamDetector.extractSuspiciousKeywords(userMessage);
 
-        if (!scamType.equals("UNKNOWN")) {
-            evidence.setScamType(scamType);
+        // Update evidence with ensemble results
+        if (!assessment.primaryScamType.equals("UNKNOWN")) {
+            evidence.setScamType(assessment.primaryScamType);
         }
-        evidence.setThreatLevel(Math.max(evidence.getThreatLevel(), threatLevel));
+        evidence.setThreatLevel(Math.max(evidence.getThreatLevel(), assessment.ensembleScore));
+        evidence.setThreatCategory(assessment.threatLevel); // SAFE/LOW/MEDIUM/HIGH/CRITICAL
+        evidence.setConfidence(assessment.calibratedConfidence);
+        evidence.setTriggeredLayers(assessment.triggeredLayers);
         evidence.getExtractedInfo().setSuspiciousKeywords(keywords);
+
+        // Store top evidence items if high threat
+        if (assessment.isHighThreat() && assessment.topEvidence != null) {
+            List<String> evidenceDescriptions = assessment.topEvidence.stream()
+                    .limit(5)
+                    .map(e -> e.description)
+                    .toList();
+            evidence.setEnsembleEvidence(evidenceDescriptions);
+        }
 
         evidence.setLastUpdated(LocalDateTime.now());
 
         // Persist to MongoDB
         persistEvidence(sessionId, evidence);
 
-        log.info("📊 Evidence collected for session {}: Threat={}, Type={}",
-                sessionId, String.format("%.2f", threatLevel), scamType);
+        log.info("Evidence collected for session {}: Threat={} ({}), Confidence={}%, Layers={}/5",
+                sessionId,
+                assessment.threatLevel,
+                String.format("%.2f", assessment.ensembleScore),
+                String.format("%.0f", assessment.calibratedConfidence * 100),
+                assessment.triggeredLayers);
     }
 
     /**
@@ -265,6 +297,7 @@ public class EvidenceCollector {
 
     /**
      * Evidence package for law enforcement
+     * Enhanced with ensemble scoring information
      */
     @Data
     @NoArgsConstructor
@@ -275,6 +308,13 @@ public class EvidenceCollector {
         private LocalDateTime lastUpdated;
         private String scamType = "UNKNOWN";
         private double threatLevel = 0.0;
+
+        // Ensemble scoring fields
+        private String threatCategory = "SAFE"; // SAFE/LOW/MEDIUM/HIGH/CRITICAL
+        private double confidence = 0.0; // Calibrated confidence (0.0-1.0)
+        private int triggeredLayers = 0; // Number of detection layers triggered (0-5)
+        private List<String> ensembleEvidence = new ArrayList<>(); // Top evidence descriptions
+
         private List<ConversationTurn> conversation = new ArrayList<>();
         private ExtractedInfo extractedInfo = new ExtractedInfo();
 
@@ -282,6 +322,13 @@ public class EvidenceCollector {
             this.sessionId = sessionId;
             this.firstContact = LocalDateTime.now();
             this.lastUpdated = LocalDateTime.now();
+        }
+
+        /**
+         * Check if this evidence represents a high-threat case
+         */
+        public boolean isHighThreat() {
+            return "HIGH".equals(threatCategory) || "CRITICAL".equals(threatCategory);
         }
     }
 

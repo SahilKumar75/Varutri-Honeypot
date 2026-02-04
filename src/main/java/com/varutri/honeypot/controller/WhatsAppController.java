@@ -1,5 +1,6 @@
 package com.varutri.honeypot.controller;
 
+import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.WhatsAppWebhook;
@@ -21,7 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Controller for WhatsApp webhook integration
+ * Controller for WhatsApp webhook integration.
+ * Returns standardized ApiResponse objects with proper HTTP status codes.
  */
 @Slf4j
 @RestController
@@ -57,6 +59,10 @@ public class WhatsAppController {
 
     /**
      * Webhook verification endpoint (required by Meta)
+     * GET /api/whatsapp/webhook
+     * 
+     * @return 200 OK with challenge on success
+     * @return 403 Forbidden on verification failure
      */
     @GetMapping("/webhook")
     public ResponseEntity<?> verifyWebhook(
@@ -68,23 +74,28 @@ public class WhatsAppController {
 
         if ("subscribe".equals(mode) && verifyToken.equals(token)) {
             log.info("✅ Webhook verified successfully");
+            // Meta expects the challenge string directly, not wrapped in JSON
             return ResponseEntity.ok(challenge);
         } else {
             log.warn("❌ Webhook verification failed");
-            return ResponseEntity.status(403).body("Verification failed");
+            return ApiResponse.forbidden("VERIFICATION_FAILED",
+                    "Webhook verification failed").toResponseEntity();
         }
     }
 
     /**
      * Webhook endpoint for receiving WhatsApp messages
+     * POST /api/whatsapp/webhook
+     * 
+     * @return 200 OK always (WhatsApp requires 200 to confirm receipt)
      */
     @PostMapping("/webhook")
-    public ResponseEntity<?> handleWebhook(@RequestBody WhatsAppWebhook webhook) {
+    public ResponseEntity<String> handleWebhook(@RequestBody WhatsAppWebhook webhook) {
         log.info("Received WhatsApp webhook: {}", webhook.getObject());
 
         try {
             if (webhook.getEntry() == null || webhook.getEntry().isEmpty()) {
-                return ResponseEntity.ok("No entries");
+                return ResponseEntity.ok("EVENT_RECEIVED");
             }
 
             for (WhatsAppWebhook.Entry entry : webhook.getEntry()) {
@@ -101,10 +112,12 @@ public class WhatsAppController {
                 }
             }
 
+            // WhatsApp requires 200 response to confirm webhook receipt
             return ResponseEntity.ok("EVENT_RECEIVED");
         } catch (Exception e) {
             log.error("Error processing webhook: {}", e.getMessage(), e);
-            return ResponseEntity.ok("ERROR");
+            // Still return 200 to WhatsApp to prevent retries
+            return ResponseEntity.ok("EVENT_RECEIVED");
         }
     }
 
@@ -192,9 +205,11 @@ public class WhatsAppController {
             // Get AI response
             String aiResponse;
             if ("ollama".equalsIgnoreCase(llmProvider)) {
-                aiResponse = ollamaService.generateResponse(messageText, request.getConversationHistory());
+                aiResponse = ollamaService.generateResponse(messageText, request.getConversationHistory(),
+                        "UNKNOWN", 0.0);
             } else {
-                aiResponse = huggingFaceService.generateResponse(messageText, request.getConversationHistory());
+                aiResponse = huggingFaceService.generateResponse(messageText, request.getConversationHistory(),
+                        "UNKNOWN", 0.0);
             }
 
             // Store conversation
@@ -214,28 +229,76 @@ public class WhatsAppController {
                 whatsAppService.notifyIntelligenceExtracted(from, "Bank Account",
                         String.join(", ", intelligence.getBankAccountNumbers()));
             }
-
-            return new ChatResponse("success", aiResponse);
+            // SECURITY: Return ONLY the reply to external parties (scammers)
+            // sessionId is stored internally but never exposed in response
+            return ChatResponse.external(aiResponse);
 
         } catch (Exception e) {
             log.error("Error processing scam message: {}", e.getMessage(), e);
-            return new ChatResponse("error", "I'm experiencing technical difficulties.");
+            return ChatResponse.external("I'm experiencing technical difficulties.");
         }
     }
 
     /**
      * Manual endpoint to initiate takeover
+     * POST /api/whatsapp/takeover
+     * 
+     * @return 200 OK on success
+     * @return 400 Bad Request if phone or message is missing
      */
     @PostMapping("/takeover")
-    public ResponseEntity<?> initiateTakeover(@RequestBody Map<String, String> request) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> initiateTakeover(
+            @RequestBody Map<String, String> request) {
         String userPhone = request.get("phone");
         String scamMessage = request.get("message");
 
-        if (userPhone == null || scamMessage == null) {
-            return ResponseEntity.badRequest().body("Missing phone or message");
+        if (userPhone == null || userPhone.isBlank()) {
+            return ApiResponse.<Map<String, String>>badRequest("MISSING_PHONE",
+                    "Phone number is required").toResponseEntity();
+        }
+
+        if (scamMessage == null || scamMessage.isBlank()) {
+            return ApiResponse.<Map<String, String>>badRequest("MISSING_MESSAGE",
+                    "Scam message is required").toResponseEntity();
         }
 
         handleScamReport(userPhone, scamMessage);
-        return ResponseEntity.ok(Map.of("status", "success", "message", "Varutri takeover initiated"));
+
+        Map<String, String> result = Map.of(
+                "status", "success",
+                "message", "Varutri takeover initiated",
+                "phone", userPhone);
+
+        return ApiResponse.ok(result, "Takeover initiated successfully");
+    }
+
+    /**
+     * Get status of a WhatsApp session
+     * GET /api/whatsapp/session/{phone}
+     * 
+     * @return 200 OK with session info
+     * @return 404 Not Found if no session exists
+     */
+    @GetMapping("/session/{phone}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getSessionStatus(@PathVariable String phone) {
+        String sessionId = phoneToSession.get(phone);
+
+        if (sessionId == null) {
+            return ApiResponse.<Map<String, Object>>notFound("SESSION_NOT_FOUND",
+                    "No active session for phone: " + phone).toResponseEntity();
+        }
+
+        int turnCount = sessionStore.getTurnCount(sessionId);
+        EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
+
+        Map<String, Object> sessionInfo = Map.of(
+                "phone", phone,
+                "sessionId", sessionId,
+                "turnCount", turnCount,
+                "hasEvidence", evidence != null,
+                "threatLevel", evidence != null ? evidence.getThreatLevel() : 0.0,
+                "scamType", evidence != null ? evidence.getScamType() : "UNKNOWN");
+
+        return ApiResponse.ok(sessionInfo, "Session retrieved successfully");
     }
 }

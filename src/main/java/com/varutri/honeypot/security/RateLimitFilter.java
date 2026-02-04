@@ -113,7 +113,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private void handleRateLimitExceeded(HttpServletResponse response, String clientId) throws IOException {
         long retryAfter = rateLimitService.getSecondsUntilRefill(clientId);
 
-        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE + 26); // 429
+        response.setStatus(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS.value());
         response.setContentType("application/json");
         response.setHeader("Retry-After", String.valueOf(retryAfter));
         response.setHeader("X-RateLimit-Remaining", "0");

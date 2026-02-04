@@ -11,11 +11,29 @@ import java.util.List;
 
 /**
  * Service for detecting scam patterns and calculating threat levels
- * Combines regex-based detection with AI-powered phishing detection
+ * Combines text normalization, regex-based detection, and AI-powered phishing
+ * detection
+ * 
+ * Text normalization handles evasion techniques:
+ * - Leetspeak: l0ttery → lottery
+ * - Homoglyphs: Cyrillic chars → Latin
+ * - Obfuscation: l.o.t.t.e.r.y → lottery
  */
 @Slf4j
 @Service
 public class ScamDetector {
+
+    // Text normalizer for handling evasion techniques
+    @Autowired
+    private TextNormalizer textNormalizer;
+
+    // Advanced pattern matcher for fuzzy, phonetic, and n-gram matching
+    @Autowired
+    private AdvancedPatternMatcher advancedPatternMatcher;
+
+    // Semantic scam analyzer for ML-based detection (embeddings, intent, tactics)
+    @Autowired(required = false)
+    private SemanticScamAnalyzer semanticScamAnalyzer;
 
     // Optional HuggingFace service for AI-powered phishing detection
     @Autowired(required = false)
@@ -23,6 +41,15 @@ public class ScamDetector {
 
     // Cache for AI detection result to avoid duplicate calls
     private final ThreadLocal<PhishingDetectionResult> cachedAiResult = new ThreadLocal<>();
+
+    // Cache for normalization analysis
+    private final ThreadLocal<TextNormalizer.NormalizationReport> cachedNormReport = new ThreadLocal<>();
+
+    // Cache for advanced pattern analysis
+    private final ThreadLocal<AdvancedPatternMatcher.PatternAnalysisResult> cachedPatternResult = new ThreadLocal<>();
+
+    // Cache for semantic analysis result
+    private final ThreadLocal<SemanticScamAnalyzer.SemanticAnalysisResult> cachedSemanticResult = new ThreadLocal<>();
 
     // Scam type keywords
     private static final List<String> INVESTMENT_SCAM_KEYWORDS = Arrays.asList(
@@ -54,20 +81,79 @@ public class ScamDetector {
 
     /**
      * Detect scam type based on message content
-     * Uses both regex patterns and AI model for comprehensive detection
+     * Uses a 5-LAYER detection pipeline:
+     * 1. Text normalization (leetspeak, homoglyphs, obfuscation)
+     * 2. Regex-based keyword matching
+     * 3. Advanced pattern matching (fuzzy, phonetic, n-gram)
+     * 4. Semantic ML analysis (embeddings, intent, manipulation tactics)
+     * 5. AI phishing model detection
      */
     public String detectScamType(String message) {
-        String lowerMessage = message.toLowerCase();
+        // === LAYER 1: Text Normalization ===
+        TextNormalizer.NormalizationReport normReport = textNormalizer.analyzeText(message);
+        cachedNormReport.set(normReport);
 
-        // First, try regex-based detection
-        String regexResult = detectScamTypeByRegex(lowerMessage);
+        String normalizedMessage = normReport.normalizedText;
+
+        // Log if obfuscation was detected (potential evasion attempt)
+        if (normReport.hasObfuscation) {
+            log.warn("Text obfuscation detected! Original: '{}', Normalized: '{}'",
+                    truncate(message, 50), truncate(normalizedMessage, 50));
+        }
+
+        // === LAYER 2: Regex-based detection on NORMALIZED text ===
+        String regexResult = detectScamTypeByRegex(normalizedMessage);
 
         // If regex found a specific type, return it
         if (!regexResult.equals("UNKNOWN")) {
+            if (normReport.hasObfuscation) {
+                return regexResult + "_OBFUSCATED";
+            }
             return regexResult;
         }
 
-        // If regex didn't find anything, try AI model
+        // === LAYER 3: Advanced Pattern Matching (fuzzy, phonetic, n-gram) ===
+        AdvancedPatternMatcher.PatternAnalysisResult patternResult = advancedPatternMatcher
+                .analyzeMessage(normalizedMessage);
+        cachedPatternResult.set(patternResult);
+
+        if (patternResult.combinedScore >= 0.5 && !patternResult.detectedCategories.isEmpty()) {
+            // Get the most likely scam type from advanced matching
+            String detectedType = patternResult.detectedCategories.iterator().next();
+            log.info("Advanced pattern matching detected: {} (score: {}, methods: fuzzy={}, phonetic={}, ngram={})",
+                    detectedType,
+                    String.format("%.2f", patternResult.combinedScore),
+                    patternResult.fuzzyMatches.size(),
+                    patternResult.phoneticMatches.size(),
+                    patternResult.ngramMatches.size());
+
+            String suffix = normReport.hasObfuscation ? "_OBFUSCATED" : "_ADVANCED";
+            return detectedType + suffix;
+        }
+
+        // === LAYER 4: Semantic ML Analysis (embeddings, intent, manipulation) ===
+        if (semanticScamAnalyzer != null) {
+            try {
+                SemanticScamAnalyzer.SemanticAnalysisResult semanticResult = semanticScamAnalyzer
+                        .analyzeMessage(normalizedMessage, null).join();
+                cachedSemanticResult.set(semanticResult);
+
+                if (semanticResult.hasSignificantMatch()) {
+                    log.info("Semantic ML detected: {} (score: {}, intents={}, tactics={})",
+                            semanticResult.primaryScamType,
+                            String.format("%.2f", semanticResult.combinedScore),
+                            semanticResult.detectedIntents.size(),
+                            semanticResult.manipulationTactics.size());
+
+                    String suffix = normReport.hasObfuscation ? "_OBFUSCATED" : "_SEMANTIC";
+                    return semanticResult.primaryScamType + suffix;
+                }
+            } catch (Exception e) {
+                log.debug("Semantic analysis skipped: {}", e.getMessage());
+            }
+        }
+
+        // === LAYER 5: AI Phishing Model Detection ===
         PhishingDetectionResult aiResult = getAiPhishingResult(message);
         if (aiResult != null && aiResult.isPhishing() && aiResult.getConfidence() > 0.7) {
             log.info("AI model detected phishing with confidence: {}",
@@ -76,6 +162,15 @@ public class ScamDetector {
         }
 
         return "UNKNOWN";
+    }
+
+    /**
+     * Truncate string for logging
+     */
+    private String truncate(String text, int maxLength) {
+        if (text == null)
+            return "";
+        return text.length() > maxLength ? text.substring(0, maxLength) + "..." : text;
     }
 
     /**
@@ -121,58 +216,118 @@ public class ScamDetector {
     }
 
     /**
-     * Clear the cached AI result (call after processing a message)
+     * Clear the cached AI result, normalization report, pattern result, and
+     * semantic result
+     * (call after processing a message)
      */
     public void clearCache() {
         cachedAiResult.remove();
+        cachedNormReport.remove();
+        cachedPatternResult.remove();
+        cachedSemanticResult.remove();
     }
 
     /**
      * Calculate threat level (0.0 to 1.0)
-     * Combines regex scoring with AI model confidence
+     * Combines all 5 detection layers: normalization, regex, advanced patterns,
+     * semantic ML, and AI
      */
     public double calculateThreatLevel(String message) {
-        String lowerMessage = message.toLowerCase();
         double threatLevel = 0.0;
 
-        // Base threat from regex-based scam type detection
-        String scamType = detectScamTypeByRegex(lowerMessage);
+        // Get or create normalization report
+        TextNormalizer.NormalizationReport normReport = cachedNormReport.get();
+        if (normReport == null) {
+            normReport = textNormalizer.analyzeText(message);
+            cachedNormReport.set(normReport);
+        }
+
+        String normalizedMessage = normReport.normalizedText;
+
+        // Obfuscation attempt adds to threat level (indicates evasion behavior)
+        if (normReport.hasObfuscation) {
+            threatLevel += 0.12;
+            log.debug("Obfuscation detected, adding 0.12 to threat level");
+        }
+
+        // Base threat from regex-based scam type detection on NORMALIZED text
+        String scamType = detectScamTypeByRegex(normalizedMessage);
         if (!scamType.equals("UNKNOWN")) {
-            threatLevel += 0.3;
+            threatLevel += 0.20;
         }
 
-        // Urgency indicators
-        if (containsKeywords(lowerMessage, URGENCY_KEYWORDS)) {
-            threatLevel += 0.2;
+        // Urgency indicators (on normalized text)
+        if (containsKeywords(normalizedMessage, URGENCY_KEYWORDS)) {
+            threatLevel += 0.12;
         }
 
-        // Payment requests
-        if (containsKeywords(lowerMessage, PAYMENT_REQUEST_KEYWORDS)) {
-            threatLevel += 0.3;
+        // Payment requests (on normalized text)
+        if (containsKeywords(normalizedMessage, PAYMENT_REQUEST_KEYWORDS)) {
+            threatLevel += 0.20;
         }
 
-        // Multiple suspicious patterns
+        // Multiple suspicious patterns (regex-based)
         int patternCount = 0;
-        if (containsKeywords(lowerMessage, INVESTMENT_SCAM_KEYWORDS))
+        if (containsKeywords(normalizedMessage, INVESTMENT_SCAM_KEYWORDS))
             patternCount++;
-        if (containsKeywords(lowerMessage, LOTTERY_SCAM_KEYWORDS))
+        if (containsKeywords(normalizedMessage, LOTTERY_SCAM_KEYWORDS))
             patternCount++;
-        if (containsKeywords(lowerMessage, TECH_SUPPORT_SCAM_KEYWORDS))
+        if (containsKeywords(normalizedMessage, TECH_SUPPORT_SCAM_KEYWORDS))
             patternCount++;
-        if (containsKeywords(lowerMessage, PHISHING_KEYWORDS))
+        if (containsKeywords(normalizedMessage, PHISHING_KEYWORDS))
             patternCount++;
-        if (containsKeywords(lowerMessage, JOB_SCAM_KEYWORDS))
+        if (containsKeywords(normalizedMessage, JOB_SCAM_KEYWORDS))
             patternCount++;
 
         if (patternCount >= 2) {
-            threatLevel += 0.2;
+            threatLevel += 0.12;
         }
 
-        // AI model contribution
+        // === Advanced Pattern Matching Contribution (max 0.15) ===
+        AdvancedPatternMatcher.PatternAnalysisResult patternResult = cachedPatternResult.get();
+        if (patternResult == null) {
+            patternResult = advancedPatternMatcher.analyzeMessage(normalizedMessage);
+            cachedPatternResult.set(patternResult);
+        }
+
+        double advancedContribution = patternResult.combinedScore * 0.15;
+        threatLevel += advancedContribution;
+
+        if (advancedContribution > 0.05) {
+            log.debug("Advanced pattern matching added {} to threat level (fuzzy={}, phonetic={}, ngram={})",
+                    String.format("%.2f", advancedContribution),
+                    patternResult.fuzzyMatches.size(),
+                    patternResult.phoneticMatches.size(),
+                    patternResult.ngramMatches.size());
+        }
+
+        // === Semantic ML Analysis Contribution (max 0.20) ===
+        if (semanticScamAnalyzer != null) {
+            try {
+                SemanticScamAnalyzer.SemanticAnalysisResult semanticResult = cachedSemanticResult.get();
+                if (semanticResult == null) {
+                    semanticResult = semanticScamAnalyzer.analyzeMessage(normalizedMessage, null).join();
+                    cachedSemanticResult.set(semanticResult);
+                }
+
+                double semanticContribution = semanticResult.combinedScore * 0.20;
+                threatLevel += semanticContribution;
+
+                if (semanticContribution > 0.05) {
+                    log.debug("Semantic ML added {} to threat level (intents={}, tactics={})",
+                            String.format("%.2f", semanticContribution),
+                            semanticResult.detectedIntents.size(),
+                            semanticResult.manipulationTactics.size());
+                }
+            } catch (Exception e) {
+                log.debug("Semantic analysis contribution skipped: {}", e.getMessage());
+            }
+        }
+
+        // === AI Model Contribution (max 0.15) ===
         PhishingDetectionResult aiResult = getAiPhishingResult(message);
         if (aiResult != null && aiResult.isPhishing()) {
-            // Add AI confidence to threat level (weighted at 0.3)
-            double aiContribution = aiResult.getConfidence() * 0.3;
+            double aiContribution = aiResult.getConfidence() * 0.15;
             threatLevel += aiContribution;
             log.debug("AI phishing detection added {} to threat level", String.format("%.2f", aiContribution));
         }

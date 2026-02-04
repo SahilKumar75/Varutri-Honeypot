@@ -49,7 +49,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!validApiKey.equals(requestApiKey)) {
+        // Use constant-time comparison to prevent timing attacks
+        if (!java.security.MessageDigest.isEqual(
+                validApiKey.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                requestApiKey.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
+
             log.warn("Invalid API key attempt from IP: {}", request.getRemoteAddr());
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
             response.setContentType("application/json");

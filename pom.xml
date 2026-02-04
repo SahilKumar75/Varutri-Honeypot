@@ -96,7 +96,22 @@
             <artifactId>bucket4j-core</artifactId>
             <version>8.7.0</version>
         </dependency>
+        
+        <!-- Apache Commons Codec for phonetic matching (Soundex, Metaphone) -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.16.0</version>
+        </dependency>
+        
+        <!-- Apache Commons Text for fuzzy string matching -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.11.0</version>
+        </dependency>
     </dependencies>
+
     
     <build>
         <plugins>

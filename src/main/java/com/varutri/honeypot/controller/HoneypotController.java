@@ -1,21 +1,26 @@
 package com.varutri.honeypot.controller;
 
+import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.ExtractedInfo;
+import com.varutri.honeypot.dto.ThreatAssessmentResponse;
+import com.varutri.honeypot.exception.ResourceNotFoundException;
 import com.varutri.honeypot.service.*;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Main REST controller for honeypot chat API
- * Includes input validation and sanitization for security
+ * Returns standardized ApiResponse objects with proper HTTP status codes
  */
 @Slf4j
 @RestController
@@ -38,9 +43,6 @@ public class HoneypotController {
     private InformationExtractor informationExtractor;
 
     @Autowired
-    private ScamDetector scamDetector;
-
-    @Autowired
     private EvidenceCollector evidenceCollector;
 
     @Autowired
@@ -49,102 +51,272 @@ public class HoneypotController {
     @Autowired
     private InputSanitizer inputSanitizer;
 
+    @Autowired
+    private EnsembleThreatScorer ensembleThreatScorer;
+
     @Value("${varutri.session.max-turns:20}")
     private int maxTurns;
+
+    @Value("${llm.provider:huggingface}")
+    private String llmProvider;
 
     /**
      * Main chat endpoint
      * POST /api/chat
-     * Input is validated via @Valid annotation
+     * 
+     * @return 200 OK with chat response on success
+     * @return 400 Bad Request on validation errors
+     * @return 503 Service Unavailable if LLM fails
      */
     @PostMapping("/chat")
-    public ResponseEntity<ChatResponse> chat(@Valid @RequestBody ChatRequest request) {
-        // Sanitize session ID for safe database queries
-        String sessionId = inputSanitizer.sanitizeSessionId(request.getSessionId());
+    /**
+     * Main chat endpoint (Asynchronous)
+     * POST /api/chat
+     * 
+     * @return 200 OK with chat response on success
+     * @return 400 Bad Request on validation errors
+     * @return 503 Service Unavailable if LLM fails
+     */
+    @PostMapping("/chat")
+    public java.util.concurrent.CompletableFuture<ResponseEntity<ApiResponse<ChatResponse>>> chat(
+            @Valid @RequestBody ChatRequest request) {
 
-        // Get message text (already validated by @Valid)
+        long startTime = System.currentTimeMillis();
+        String sessionId = inputSanitizer.sanitizeSessionId(request.getSessionId());
         String userMessage = request.getMessage().getText();
         String sender = request.getMessage().getSender();
 
-        // Log with sanitized output to prevent log injection
         log.info("Received message for session {}: {} from {}",
-                sessionId,
-                inputSanitizer.sanitizeForLogging(userMessage),
-                sender);
+                sessionId, inputSanitizer.sanitizeForLogging(userMessage), sender);
 
-        // Check for potential prompt injection (log but don't block - honeypot should
-        // engage)
         if (inputSanitizer.containsPromptInjection(userMessage)) {
-            log.warn("⚠️ Potential prompt injection detected in session {}", sessionId);
+            log.warn("Potential prompt injection detected in session {}", sessionId);
         }
 
-        try {
-            // Extract intelligence from user message
-            ExtractedInfo extracted = informationExtractor.extractInformation(userMessage);
+        // 1. Parallel Task: Extract Information (runs in common pool)
+        java.util.concurrent.CompletableFuture<ExtractedInfo> extractionFuture = java.util.concurrent.CompletableFuture
+                .supplyAsync(() -> informationExtractor.extractInformation(userMessage));
 
-            // Detect scam type and threat level
-            String scamType = scamDetector.detectScamType(userMessage);
-            double threatLevel = scamDetector.calculateThreatLevel(userMessage);
+        // 2. Parallel Task: Threat Assessment (fully async pipeline)
+        java.util.concurrent.CompletableFuture<EnsembleThreatScorer.ThreatAssessment> assessmentFuture = ensembleThreatScorer
+                .assessThreatAsync(userMessage, request.getConversationHistory());
 
-            if (threatLevel >= 0.6) {
-                log.warn("HIGH THREAT DETECTED! Session: {}, Type: {}, Level: {}",
-                        sessionId, scamType, String.format("%.2f", threatLevel));
-            }
+        // 3. Combine results and proceed to Response Generation
+        return java.util.concurrent.CompletableFuture.allOf(extractionFuture, assessmentFuture)
+                .thenCompose(v -> {
+                    // Both parallel tasks are done
+                    ExtractedInfo extracted = extractionFuture.join();
+                    EnsembleThreatScorer.ThreatAssessment assessment = assessmentFuture.join();
 
-            // Update session with incoming message
-            sessionStore.addMessage(sessionId, "user", userMessage);
+                    double threatLevel = assessment.ensembleScore;
+                    String scamType = assessment.primaryScamType;
+                    String threatCategory = assessment.threatLevel;
 
-            // Get conversation history (merge with request history if provided)
-            List<ChatRequest.ConversationMessage> conversationHistory = mergeConversationHistory(sessionId,
-                    request.getConversationHistory());
+                    if (assessment.isHighThreat()) {
+                        log.warn(
+                                "HIGH THREAT DETECTED! Session: {}, Type: {}, Level: {}, Confidence: {}%, Layers: {}/5",
+                                sessionId, scamType, threatCategory,
+                                String.format("%.0f", assessment.calibratedConfidence * 100),
+                                assessment.triggeredLayers);
+                    }
 
-            // Generate AI response using configured LLM provider
-            String aiResponse = generateResponse(userMessage, conversationHistory, scamType, threatLevel);
+                    // Synchronous DB operations (keep fast enough, or move to separate thread if
+                    // needed)
+                    sessionStore.addMessage(sessionId, "user", userMessage);
+                    List<ChatRequest.ConversationMessage> conversationHistory = mergeConversationHistory(sessionId,
+                            request.getConversationHistory());
 
-            // Update session with AI response
-            sessionStore.addMessage(sessionId, "assistant", aiResponse);
+                    // 4. Async Response Generation
+                    return generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel)
+                            .thenApply(aiResponse -> {
+                                // 5. Post-response processing
+                                sessionStore.addMessage(sessionId, "assistant", aiResponse);
+                                evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
 
-            // Collect evidence for this conversation turn
-            evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
+                                int turnCount = sessionStore.getTurnCount(sessionId);
+                                if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
+                                    log.info("Session {} reached max turns, triggering callback", sessionId);
+                                    // Run non-critical callbacks in background
+                                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                                        sendFinalCallback(sessionId);
+                                        governmentReportService.processAutoReport(sessionId);
+                                    });
+                                }
 
-            // Check if we should trigger final callback
-            int turnCount = sessionStore.getTurnCount(sessionId);
-            if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
-                log.info("Session {} reached max turns ({}), triggering final callback", sessionId, turnCount);
-                sendFinalCallback(sessionId);
+                                long processingTime = System.currentTimeMillis() - startTime;
+                                log.info("Response generated for session {} (turn {}, threat: {}, {}ms)",
+                                        sessionId, turnCount, threatCategory, processingTime);
 
-                // Trigger automatic government report if high threat
-                governmentReportService.processAutoReport(sessionId);
-            }
+                                ChatResponse externalResponse = ChatResponse.external(aiResponse);
+                                return ApiResponse.ok(externalResponse, "Message processed successfully");
+                            });
+                })
+                .exceptionally(e -> {
+                    log.error("Error processing chat for session {}: {}", sessionId, e.getMessage(), e);
+                    // Unwrap CompletionException
+                    Throwable cause = e instanceof java.util.concurrent.CompletionException ? e.getCause() : e;
 
-            log.info("Response generated for session {} (turn {})", sessionId, turnCount);
+                    if (cause instanceof IllegalStateException) {
+                        return ApiResponse.<ChatResponse>serviceUnavailable("AI service configuration error")
+                                .toResponseEntity();
+                    }
+                    return ApiResponse.<ChatResponse>internalError("CHAT_ERROR", "Failed to process message")
+                            .toResponseEntity();
+                });
+    }
 
-            return ResponseEntity.ok(ChatResponse.success(aiResponse));
+    /**
+     * Generate response asynchronously using configured LLM provider
+     */
+    private java.util.concurrent.CompletableFuture<String> generateResponseAsync(String userMessage,
+            List<ChatRequest.ConversationMessage> conversationHistory,
+            String scamType, double threatLevel) {
 
-        } catch (Exception e) {
-            log.error("Error processing chat for session {}: {}", sessionId, e.getMessage(), e);
-            return ResponseEntity.status(500)
-                    .body(ChatResponse.error("Internal server error"));
+        if (huggingFaceService != null) {
+            return huggingFaceService.generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
+        } else if (ollamaService != null) {
+            return ollamaService.generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
+        } else {
+            return java.util.concurrent.CompletableFuture.failedFuture(
+                    new IllegalStateException(
+                            "No LLM service configured. Please set llm.provider to 'ollama' or 'huggingface'"));
         }
     }
 
     /**
      * Health check endpoint
+     * GET /api/health
+     * 
+     * @return 200 OK with health status
      */
     @GetMapping("/health")
-    public ResponseEntity<String> health() {
-        return ResponseEntity.ok("{\"status\":\"healthy\",\"service\":\"varutri-honeypot\"}");
+    public ResponseEntity<ApiResponse<Map<String, Object>>> health() {
+        Map<String, Object> healthData = Map.of(
+                "status", "healthy",
+                "service", "varutri-honeypot",
+                "llmProvider", llmProvider,
+                "huggingFaceAvailable", huggingFaceService != null,
+                "ollamaAvailable", ollamaService != null);
+
+        return ApiResponse.ok(healthData, "Service is healthy");
     }
 
     /**
-     * Manually trigger callback for a session (for testing)
+     * Comprehensive threat assessment endpoint
+     * POST /api/assess
+     * 
+     * @return 200 OK with threat assessment
+     * @return 400 Bad Request on validation errors
+     */
+    @PostMapping("/assess")
+    public ResponseEntity<ApiResponse<ThreatAssessmentResponse>> assessThreat(
+            @Valid @RequestBody ChatRequest request) {
+        try {
+            String sessionId = request.getSessionId();
+            String userMessage = request.getMessage().getText();
+
+            // Sanitize input
+            userMessage = inputSanitizer.sanitizeMessageText(userMessage);
+
+            log.info("Threat assessment requested for session: {}", sessionId);
+
+            // Perform comprehensive ensemble threat analysis
+            EnsembleThreatScorer.ThreatAssessment assessment = ensembleThreatScorer.assessThreat(userMessage,
+                    request.getConversationHistory());
+
+            // Convert to API response
+            ThreatAssessmentResponse response = ThreatAssessmentResponse.fromAssessment(assessment);
+
+            log.info("Assessment complete: {} ({}% confidence)",
+                    response.getThreatLevel(),
+                    response.getConfidencePercent());
+
+            return ApiResponse.ok(response, "Threat assessment completed");
+
+        } catch (Exception e) {
+            log.error("Error in threat assessment: {}", e.getMessage(), e);
+            return ApiResponse.<ThreatAssessmentResponse>internalError("ASSESSMENT_ERROR",
+                    "Failed to complete threat assessment").toResponseEntity();
+        }
+    }
+
+    /**
+     * Manually trigger callback for a session
+     * POST /api/callback/{sessionId}
+     * 
+     * @return 200 OK on success
+     * @return 404 Not Found if session doesn't exist
      */
     @PostMapping("/callback/{sessionId}")
-    public ResponseEntity<String> triggerCallback(@PathVariable String sessionId) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> triggerCallback(@PathVariable String sessionId) {
         log.info("Manual callback triggered for session: {}", sessionId);
+
+        EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
+        if (evidence == null) {
+            throw new ResourceNotFoundException("Session", sessionId);
+        }
+
         sendFinalCallback(sessionId);
-        return ResponseEntity.ok("{\"status\":\"callback_sent\"}");
+
+        Map<String, String> result = Map.of(
+                "sessionId", sessionId,
+                "status", "callback_sent");
+
+        return ApiResponse.ok(result, "Callback sent successfully");
     }
+
+    /**
+     * Get evidence for a specific session
+     * GET /api/evidence/{sessionId}
+     * 
+     * @return 200 OK with evidence
+     * @return 404 Not Found if no evidence exists
+     */
+    @GetMapping("/evidence/{sessionId}")
+    public ResponseEntity<ApiResponse<EvidenceCollector.EvidencePackage>> getEvidence(
+            @PathVariable String sessionId) {
+        log.info("Evidence requested for session: {}", sessionId);
+
+        EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
+
+        if (evidence == null) {
+            throw new ResourceNotFoundException("Evidence", sessionId);
+        }
+
+        return ApiResponse.ok(evidence, "Evidence retrieved successfully");
+    }
+
+    /**
+     * Get all high-threat evidence packages
+     * GET /api/evidence/high-threat
+     * 
+     * @return 200 OK with list of high-threat evidence
+     */
+    @GetMapping("/evidence/high-threat")
+    public ResponseEntity<ApiResponse<List<EvidenceCollector.EvidencePackage>>> getHighThreatEvidence() {
+        log.info("High-threat evidence requested");
+        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getHighThreatEvidence();
+
+        return ApiResponse.ok(evidence,
+                String.format("Retrieved %d high-threat evidence package(s)", evidence.size()));
+    }
+
+    /**
+     * Get all evidence packages
+     * GET /api/evidence
+     * 
+     * @return 200 OK with list of all evidence
+     */
+    @GetMapping("/evidence")
+    public ResponseEntity<ApiResponse<List<EvidenceCollector.EvidencePackage>>> getAllEvidence() {
+        log.info("All evidence requested");
+        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getAllEvidence();
+
+        return ApiResponse.ok(evidence,
+                String.format("Retrieved %d evidence package(s)", evidence.size()));
+    }
+
+    // ==================== PRIVATE HELPER METHODS ====================
 
     /**
      * Merge conversation histories
@@ -152,7 +324,6 @@ public class HoneypotController {
     private List<ChatRequest.ConversationMessage> mergeConversationHistory(
             String sessionId,
             List<ChatRequest.ConversationMessage> requestHistory) {
-        // Use request history if provided, otherwise use stored session history
         if (requestHistory != null && !requestHistory.isEmpty()) {
             return requestHistory;
         }
@@ -179,15 +350,12 @@ public class HoneypotController {
      */
     private void sendFinalCallback(String sessionId) {
         try {
-            // Get evidence package
             EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
 
             if (evidence != null) {
-                // Generate agent notes
                 String agentNotes = String.format("Scam type: %s, Threat level: %.2f, Engagement successful",
                         evidence.getScamType(), evidence.getThreatLevel());
 
-                // Send to GUVI
                 callbackService.sendFinalReport(
                         sessionId,
                         evidence.getExtractedInfo(),
@@ -199,51 +367,10 @@ public class HoneypotController {
                 log.warn("No evidence found for session {}, skipping callback", sessionId);
             }
 
-            // Clear session after callback
             sessionStore.clearSession(sessionId);
 
         } catch (Exception e) {
             log.error("Error sending final callback for session {}: {}", sessionId, e.getMessage(), e);
         }
-    }
-
-    /**
-     * Get evidence for a specific session
-     * GET /api/evidence/{sessionId}
-     */
-    @GetMapping("/evidence/{sessionId}")
-    public ResponseEntity<?> getEvidence(@PathVariable String sessionId) {
-        log.info("Evidence requested for session: {}", sessionId);
-
-        EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
-
-        if (evidence == null) {
-            return ResponseEntity.status(404)
-                    .body("{\"error\":\"No evidence found for session: " + sessionId + "\"}");
-        }
-
-        return ResponseEntity.ok(evidence);
-    }
-
-    /**
-     * Get all high-threat evidence packages
-     * GET /api/evidence/high-threat
-     */
-    @GetMapping("/evidence/high-threat")
-    public ResponseEntity<?> getHighThreatEvidence() {
-        log.info("High-threat evidence requested");
-        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getHighThreatEvidence();
-        return ResponseEntity.ok(evidence);
-    }
-
-    /**
-     * Get all evidence packages
-     * GET /api/evidence
-     */
-    @GetMapping("/evidence")
-    public ResponseEntity<?> getAllEvidence() {
-        log.info("All evidence requested");
-        List<EvidenceCollector.EvidencePackage> evidence = evidenceCollector.getAllEvidence();
-        return ResponseEntity.ok(evidence);
     }
 }

@@ -1,5 +1,6 @@
 package com.varutri.honeypot.exception;
 
+import com.varutri.honeypot.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,13 +12,13 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * Global exception handler for consistent error responses
- * Follows Spring Boot best practices for REST API error handling
+ * Global exception handler for consistent error responses.
+ * All exceptions are transformed into standardized ApiResponse format.
  */
 @Slf4j
 @RestControllerAdvice
@@ -28,7 +29,9 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request with field-level error details
      */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationErrors(
+            MethodArgumentNotValidException ex) {
+        
         Map<String, String> fieldErrors = new HashMap<>();
         
         ex.getBindingResult().getAllErrors().forEach(error -> {
@@ -41,13 +44,18 @@ public class GlobalExceptionHandler {
 
         log.warn("Validation failed: {}", fieldErrors);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "Validation failed");
-        response.put("errors", fieldErrors);
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.BAD_REQUEST.value());
+        String errorDetails = fieldErrors.entrySet().stream()
+                .map(e -> e.getKey() + ": " + e.getValue())
+                .collect(Collectors.joining("; "));
+
+        ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
+                .success(false)
+                .status(HttpStatus.BAD_REQUEST.value())
+                .message("Validation failed")
+                .data(fieldErrors)
+                .error(new ApiResponse.ErrorDetails("VALIDATION_ERROR", errorDetails))
+                .timestamp(java.time.Instant.now().toString())
+                .build();
 
         return ResponseEntity.badRequest().body(response);
     }
@@ -57,17 +65,11 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> handleMalformedJson(HttpMessageNotReadableException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleMalformedJson(HttpMessageNotReadableException ex) {
         log.warn("Malformed JSON request: {}", ex.getMessage());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "Invalid JSON format in request body");
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.BAD_REQUEST.value());
-
-        return ResponseEntity.badRequest().body(response);
+        return ApiResponse.<Void>badRequest("INVALID_JSON", 
+                "Invalid JSON format in request body").toResponseEntity();
     }
 
     /**
@@ -75,17 +77,11 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request
      */
     @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<Map<String, Object>> handleSecurityException(SecurityException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleSecurityException(SecurityException ex) {
         log.warn("Security exception: {}", ex.getMessage());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "Request rejected for security reasons");
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.BAD_REQUEST.value());
-
-        return ResponseEntity.badRequest().body(response);
+        return ApiResponse.<Void>badRequest("SECURITY_VIOLATION", 
+                "Request rejected for security reasons").toResponseEntity();
     }
 
     /**
@@ -93,17 +89,11 @@ public class GlobalExceptionHandler {
      * Returns 400 Bad Request
      */
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
         log.warn("Illegal argument: {}", ex.getMessage());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", ex.getMessage());
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.BAD_REQUEST.value());
-
-        return ResponseEntity.badRequest().body(response);
+        return ApiResponse.<Void>badRequest("INVALID_ARGUMENT", 
+                ex.getMessage()).toResponseEntity();
     }
 
     /**
@@ -111,35 +101,62 @@ public class GlobalExceptionHandler {
      * Returns 405 Method Not Allowed
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-    public ResponseEntity<Map<String, Object>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException ex) {
         log.warn("Method not supported: {}", ex.getMessage());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "HTTP method not supported: " + ex.getMethod());
-        response.put("supportedMethods", ex.getSupportedHttpMethods());
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.METHOD_NOT_ALLOWED.value());
+        String supportedMethods = ex.getSupportedHttpMethods() != null 
+                ? ex.getSupportedHttpMethods().toString() 
+                : "unknown";
 
-        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(response);
+        return ApiResponse.<Void>error(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "METHOD_NOT_ALLOWED",
+                "HTTP method '" + ex.getMethod() + "' not supported. Supported: " + supportedMethods
+        ).toResponseEntity();
     }
 
     /**
      * Handle 404 Not Found
      */
     @ExceptionHandler(NoHandlerFoundException.class)
-    public ResponseEntity<Map<String, Object>> handleNotFound(NoHandlerFoundException ex) {
+    public ResponseEntity<ApiResponse<Void>> handleNotFound(NoHandlerFoundException ex) {
         log.warn("Endpoint not found: {}", ex.getRequestURL());
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "Endpoint not found: " + ex.getRequestURL());
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.NOT_FOUND.value());
+        return ApiResponse.<Void>notFound("ENDPOINT_NOT_FOUND", 
+                "Endpoint not found: " + ex.getRequestURL()).toResponseEntity();
+    }
 
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+    /**
+     * Handle resource not found exceptions
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleResourceNotFound(ResourceNotFoundException ex) {
+        log.warn("Resource not found: {}", ex.getMessage());
+
+        return ApiResponse.<Void>notFound("RESOURCE_NOT_FOUND", 
+                ex.getMessage()).toResponseEntity();
+    }
+
+    /**
+     * Handle rate limit exceeded
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRateLimitExceeded(RateLimitExceededException ex) {
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+
+        return ApiResponse.<Void>tooManyRequests(ex.getMessage()).toResponseEntity();
+    }
+
+    /**
+     * Handle LLM service failures
+     */
+    @ExceptionHandler(LLMServiceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLLMServiceException(LLMServiceException ex) {
+        log.error("LLM service failure: {}", ex.getMessage());
+
+        return ApiResponse.<Void>serviceUnavailable(
+                "AI service temporarily unavailable. Please try again.").toResponseEntity();
     }
 
     /**
@@ -148,16 +165,10 @@ public class GlobalExceptionHandler {
      * Logs full stack trace but returns safe message to client
      */
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, Object>> handleGenericException(Exception ex) {
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         log.error("Unhandled exception: {}", ex.getMessage(), ex);
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", false);
-        response.put("status", "error");
-        response.put("message", "An internal error occurred. Please try again later.");
-        response.put("timestamp", LocalDateTime.now().toString());
-        response.put("code", HttpStatus.INTERNAL_SERVER_ERROR.value());
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        return ApiResponse.<Void>internalError("INTERNAL_ERROR", 
+                "An internal error occurred. Please try again later.").toResponseEntity();
     }
 }
