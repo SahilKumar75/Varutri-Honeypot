@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Controller for WhatsApp webhook integration.
@@ -34,10 +35,10 @@ public class WhatsAppController {
     private WhatsAppService whatsAppService;
 
     @Autowired
-    private HuggingFaceService huggingFaceService;
+    private Optional<HuggingFaceService> huggingFaceService;
 
     @Autowired
-    private OllamaService ollamaService;
+    private Optional<OllamaService> ollamaService;
 
     @Autowired
     private SessionStore sessionStore;
@@ -204,12 +205,15 @@ public class WhatsAppController {
 
             // Get AI response
             String aiResponse;
-            if ("ollama".equalsIgnoreCase(llmProvider)) {
-                aiResponse = ollamaService.generateResponse(messageText, request.getConversationHistory(),
+            // Determine active provider based on bean presence
+            if (huggingFaceService.isPresent()) {
+                aiResponse = huggingFaceService.get().generateResponse(messageText, request.getConversationHistory(),
+                        "UNKNOWN", 0.0);
+            } else if (ollamaService.isPresent()) {
+                aiResponse = ollamaService.get().generateResponse(messageText, request.getConversationHistory(),
                         "UNKNOWN", 0.0);
             } else {
-                aiResponse = huggingFaceService.generateResponse(messageText, request.getConversationHistory(),
-                        "UNKNOWN", 0.0);
+                return ChatResponse.external("System error: No AI provider available.");
             }
 
             // Store conversation
@@ -302,4 +306,3 @@ public class WhatsAppController {
         return ApiResponse.ok(sessionInfo, "Session retrieved successfully");
     }
 }
-

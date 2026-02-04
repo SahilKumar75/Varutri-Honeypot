@@ -1,4 +1,5 @@
 package com.varutri.honeypot.controller;
+
 import com.varutri.honeypot.service.security.InputSanitizer;
 import com.varutri.honeypot.service.llm.OllamaService;
 import com.varutri.honeypot.service.core.GovernmentReportService;
@@ -13,6 +14,7 @@ import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.ExtractedInfo;
+import com.varutri.honeypot.dto.ExtractedIntelligence;
 import com.varutri.honeypot.dto.ThreatAssessmentResponse;
 import com.varutri.honeypot.exception.ResourceNotFoundException;
 
@@ -26,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Main REST controller for honeypot chat API
@@ -36,11 +39,11 @@ import java.util.Map;
 @RequestMapping("/api")
 public class HoneypotController {
 
-    @Autowired(required = false)
-    private OllamaService ollamaService;
+    @Autowired
+    private Optional<OllamaService> ollamaService;
 
-    @Autowired(required = false)
-    private HuggingFaceService huggingFaceService;
+    @Autowired
+    private Optional<HuggingFaceService> huggingFaceService;
 
     @Autowired
     private SessionStore sessionStore;
@@ -120,35 +123,60 @@ public class HoneypotController {
                                 assessment.triggeredLayers);
                     }
 
-                    // Synchronous DB operations (keep fast enough, or move to separate thread if
-                    // needed)
-                    sessionStore.addMessage(sessionId, "user", userMessage);
+                    // Synchronous DB operations (Degraded mode support)
+                    try {
+                        sessionStore.addMessage(sessionId, "user", userMessage);
+                    } catch (Exception e) {
+                        log.warn("Failed to store user message (DB issue): {}", e.getMessage());
+                    }
+
                     List<ChatRequest.ConversationMessage> conversationHistory = mergeConversationHistory(sessionId,
                             request.getConversationHistory());
+
+                    // Capture for inner lambda
+                    final ExtractedInfo finalExtracted = extracted;
+                    final String finalScamType = scamType;
+                    final double finalThreatLevel = threatLevel;
+                    final String finalThreatCategory = threatCategory;
 
                     // 4. Async Response Generation
                     return generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel)
                             .thenApply(aiResponse -> {
                                 // 5. Post-response processing
-                                sessionStore.addMessage(sessionId, "assistant", aiResponse);
-                                evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
+                                try {
+                                    sessionStore.addMessage(sessionId, "assistant", aiResponse);
+                                    evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
 
-                                int turnCount = sessionStore.getTurnCount(sessionId);
-                                if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
-                                    log.info("Session {} reached max turns, triggering callback", sessionId);
-                                    // Run non-critical callbacks in background
-                                    java.util.concurrent.CompletableFuture.runAsync(() -> {
-                                        sendFinalCallback(sessionId);
-                                        governmentReportService.processAutoReport(sessionId);
-                                    });
+                                    int turnCount = sessionStore.getTurnCount(sessionId);
+                                    if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
+                                        log.info("Session {} reached max turns, triggering callback", sessionId);
+                                        // Run non-critical callbacks in background
+                                        java.util.concurrent.CompletableFuture.runAsync(() -> {
+                                            try {
+                                                sendFinalCallback(sessionId);
+                                                governmentReportService.processAutoReport(sessionId);
+                                            } catch (Exception ex) {
+                                                log.warn("Failed to send callback (async): {}", ex.getMessage());
+                                            }
+                                        });
+                                    }
+                                } catch (Exception e) {
+                                    log.warn("Failed to store assistant response/evidence (DB issue): {}",
+                                            e.getMessage());
                                 }
 
                                 long processingTime = System.currentTimeMillis() - startTime;
-                                log.info("Response generated for session {} (turn {}, threat: {}, {}ms)",
-                                        sessionId, turnCount, threatCategory, processingTime);
+                                log.info("Response generated for session {} (threat: {}, {}ms)",
+                                        sessionId, finalThreatCategory, processingTime);
 
-                                ChatResponse externalResponse = ChatResponse.external(aiResponse);
-                                return ApiResponse.ok(externalResponse, "Message processed successfully");
+                                // Build response WITH extracted intelligence
+                                ExtractedIntelligence intel = ExtractedIntelligence.fromExtractedInfo(
+                                        finalExtracted, finalScamType, finalThreatLevel, finalThreatCategory);
+                                ChatResponse responseWithIntel = ChatResponse.builder()
+                                        .reply(aiResponse)
+                                        .extractedIntelligence(intel)
+                                        .build();
+                                return ApiResponse.ok(responseWithIntel, "Message processed successfully");
                             });
                 })
                 .exceptionally(e -> {
@@ -172,10 +200,11 @@ public class HoneypotController {
             List<ChatRequest.ConversationMessage> conversationHistory,
             String scamType, double threatLevel) {
 
-        if (huggingFaceService != null) {
-            return huggingFaceService.generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
-        } else if (ollamaService != null) {
-            return ollamaService.generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
+        if (huggingFaceService.isPresent()) {
+            return huggingFaceService.get().generateResponseAsync(userMessage, conversationHistory, scamType,
+                    threatLevel);
+        } else if (ollamaService.isPresent()) {
+            return ollamaService.get().generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
         } else {
             return java.util.concurrent.CompletableFuture.failedFuture(
                     new IllegalStateException(
@@ -195,8 +224,8 @@ public class HoneypotController {
                 "status", "healthy",
                 "service", "varutri-honeypot",
                 "llmProvider", llmProvider,
-                "huggingFaceAvailable", huggingFaceService != null,
-                "ollamaAvailable", ollamaService != null);
+                "huggingFaceAvailable", huggingFaceService.isPresent(),
+                "ollamaAvailable", ollamaService.isPresent());
 
         return ApiResponse.ok(healthData, "Service is healthy");
     }
@@ -327,21 +356,11 @@ public class HoneypotController {
         if (requestHistory != null && !requestHistory.isEmpty()) {
             return requestHistory;
         }
-        return sessionStore.getConversationHistory(sessionId);
-    }
-
-    /**
-     * Generate response using configured LLM provider
-     */
-    private String generateResponse(String userMessage, List<ChatRequest.ConversationMessage> conversationHistory,
-            String scamType, double threatLevel) {
-        if (huggingFaceService != null) {
-            return huggingFaceService.generateResponse(userMessage, conversationHistory, scamType, threatLevel);
-        } else if (ollamaService != null) {
-            return ollamaService.generateResponse(userMessage, conversationHistory, scamType, threatLevel);
-        } else {
-            throw new IllegalStateException(
-                    "No LLM service configured. Please set llm.provider to 'ollama' or 'huggingface'");
+        try {
+            return sessionStore.getConversationHistory(sessionId);
+        } catch (Exception e) {
+            log.warn("Failed to fetch conversation history (DB issue): {}", e.getMessage());
+            return new java.util.ArrayList<>();
         }
     }
 
@@ -374,4 +393,3 @@ public class HoneypotController {
         }
     }
 }
-

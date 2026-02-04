@@ -54,6 +54,13 @@ public class ChatResponse {
     private ThreatInfo threatAssessment;
 
     /**
+     * Extracted intelligence from the scam message.
+     * This IS safe to return - it's the intelligence gathered from the scammer.
+     */
+    @JsonProperty("extractedIntelligence")
+    private ExtractedIntelligence extractedIntelligence;
+
+    /**
      * Response generation metadata.
      * WARNING: Never expose to external parties - reveals infrastructure.
      */
@@ -70,6 +77,18 @@ public class ChatResponse {
     public static ChatResponse external(String reply) {
         return ChatResponse.builder()
                 .reply(reply)
+                .build();
+    }
+
+    /**
+     * Create a response with reply AND extracted intelligence.
+     * Use this for honeypot responses that need to report gathered intel.
+     */
+    public static ChatResponse withIntelligence(String reply, ExtractedInfo extractedInfo) {
+        ExtractedIntelligence intel = ExtractedIntelligence.fromExtractedInfo(extractedInfo);
+        return ChatResponse.builder()
+                .reply(reply)
+                .extractedIntelligence(intel)
                 .build();
     }
 
