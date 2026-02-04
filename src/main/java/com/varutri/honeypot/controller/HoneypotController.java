@@ -14,7 +14,7 @@ import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.ChatResponse;
 import com.varutri.honeypot.dto.ExtractedInfo;
-import com.varutri.honeypot.dto.ExtractedIntelligence;
+
 import com.varutri.honeypot.dto.ThreatAssessmentResponse;
 import com.varutri.honeypot.exception.ResourceNotFoundException;
 
@@ -81,7 +81,7 @@ public class HoneypotController {
      * @return 503 Service Unavailable if LLM fails
      */
     @PostMapping("/chat")
-    public java.util.concurrent.CompletableFuture<ResponseEntity<ApiResponse<ChatResponse>>> chat(
+    public java.util.concurrent.CompletableFuture<ResponseEntity<Map<String, String>>> chat(
             @Valid @RequestBody ChatRequest request) {
 
         long startTime = System.currentTimeMillis();
@@ -125,7 +125,7 @@ public class HoneypotController {
 
                     // Synchronous DB operations (Degraded mode support)
                     try {
-                        sessionStore.addMessage(sessionId, "user", userMessage);
+                        sessionStore.addMessage(sessionId, sender, userMessage);
                     } catch (Exception e) {
                         log.warn("Failed to store user message (DB issue): {}", e.getMessage());
                     }
@@ -145,10 +145,18 @@ public class HoneypotController {
                                 // 5. Post-response processing
                                 try {
                                     sessionStore.addMessage(sessionId, "assistant", aiResponse);
-                                    evidenceCollector.collectEvidence(sessionId, userMessage, aiResponse);
+                                    boolean hasNewIntel = evidenceCollector.collectEvidence(sessionId, userMessage,
+                                            aiResponse);
+                                    sessionStore.updateIntelligenceStatus(sessionId, hasNewIntel);
 
-                                    int turnCount = sessionStore.getTurnCount(sessionId);
-                                    if (sessionStore.shouldTriggerCallback(sessionId, maxTurns)) {
+                                    EvidenceCollector.EvidencePackage currentEvidence = evidenceCollector
+                                            .getEvidence(sessionId);
+                                    boolean hasCritical = currentEvidence != null
+                                            && currentEvidence.hasCriticalEvidence();
+                                    boolean highThreat = currentEvidence != null && currentEvidence.isHighThreat();
+
+                                    if (sessionStore.shouldTriggerCallback(sessionId, maxTurns, highThreat,
+                                            hasCritical)) {
                                         log.info("Session {} reached max turns, triggering callback", sessionId);
                                         // Run non-critical callbacks in background
                                         java.util.concurrent.CompletableFuture.runAsync(() -> {
@@ -169,14 +177,11 @@ public class HoneypotController {
                                 log.info("Response generated for session {} (threat: {}, {}ms)",
                                         sessionId, finalThreatCategory, processingTime);
 
-                                // Build response WITH extracted intelligence
-                                ExtractedIntelligence intel = ExtractedIntelligence.fromExtractedInfo(
-                                        finalExtracted, finalScamType, finalThreatLevel, finalThreatCategory);
-                                ChatResponse responseWithIntel = ChatResponse.builder()
-                                        .reply(aiResponse)
-                                        .extractedIntelligence(intel)
-                                        .build();
-                                return ApiResponse.ok(responseWithIntel, "Message processed successfully");
+                                // Build flat response structure as requested
+                                Map<String, String> response = Map.of(
+                                        "status", "success",
+                                        "reply", aiResponse);
+                                return ResponseEntity.ok(response);
                             });
                 })
                 .exceptionally(e -> {
@@ -185,11 +190,11 @@ public class HoneypotController {
                     Throwable cause = e instanceof java.util.concurrent.CompletionException ? e.getCause() : e;
 
                     if (cause instanceof IllegalStateException) {
-                        return ApiResponse.<ChatResponse>serviceUnavailable("AI service configuration error")
-                                .toResponseEntity();
+                        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                                .body(Map.of("status", "error", "reply", "AI service configuration error"));
                     }
-                    return ApiResponse.<ChatResponse>internalError("CHAT_ERROR", "Failed to process message")
-                            .toResponseEntity();
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("status", "error", "reply", "Failed to process message"));
                 });
     }
 
@@ -371,7 +376,7 @@ public class HoneypotController {
         try {
             EvidenceCollector.EvidencePackage evidence = evidenceCollector.getEvidence(sessionId);
 
-            if (evidence != null) {
+            if (evidence != null && evidence.getThreatLevel() >= 0.5) {
                 String agentNotes = String.format("Scam type: %s, Threat level: %.2f, Engagement successful",
                         evidence.getScamType(), evidence.getThreatLevel());
 

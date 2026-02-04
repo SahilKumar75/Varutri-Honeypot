@@ -1,4 +1,5 @@
 package com.varutri.honeypot.service.ai;
+
 import com.varutri.honeypot.service.data.EvidenceCollector;
 
 import com.varutri.honeypot.dto.*;
@@ -59,7 +60,7 @@ public class ScamSimulator {
                 ChatRequest.Message message = new ChatRequest.Message();
                 message.setSender(scamMsg.getSender());
                 message.setText(scamMsg.getText());
-                message.setTimestamp(LocalDateTime.now().toString());
+                message.setTimestamp(System.currentTimeMillis());
                 request.setMessage(message);
 
                 request.setConversationHistory(new ArrayList<>());
@@ -216,4 +217,3 @@ public class ScamSimulator {
         return summary.toString();
     }
 }
-

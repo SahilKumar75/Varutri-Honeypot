@@ -94,9 +94,44 @@ public class SessionStore {
     /**
      * Check if session should trigger final callback
      */
-    public boolean shouldTriggerCallback(String sessionId, int maxTurns) {
-        int turnCount = getTurnCount(sessionId);
-        return turnCount >= maxTurns;
+    /**
+     * Check if session should trigger final callback
+     * Uses Dynamic Termination Strategy (Satuation Logic)
+     */
+    public boolean shouldTriggerCallback(String sessionId, int maxTurns, boolean isHighThreat,
+            boolean hasCriticalEvidence) {
+        SessionData session = getOrCreateSession(sessionId);
+        int turnCount = session.getTurnCount();
+
+        // 1. Safety Hard Limit (DoS Protection) -> Increased to 2x maxTurns for safety
+        if (turnCount >= maxTurns * 2) {
+            log.warn("Session {} hit hard safety limit of {} turns", sessionId, maxTurns * 2);
+            return true;
+        }
+
+        // 2. Intelligence Saturation (The "Stale" Check)
+        // If we have high threat + critical evidence + no new info for 5 turns -> STOP
+        if (isHighThreat && hasCriticalEvidence && session.getConsecutiveTurnsWithoutIntel() >= 5) {
+            log.info("Session {} saturated: High threat, critical evidence found, and 5 turns without new info",
+                    sessionId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Update intelligence tracking status
+     */
+    public void updateIntelligenceStatus(String sessionId, boolean hasNewIntel) {
+        SessionData session = getOrCreateSession(sessionId);
+        if (hasNewIntel) {
+            session.setConsecutiveTurnsWithoutIntel(0);
+            session.setLastIntelligenceTurn(session.getTurnCount());
+        } else {
+            session.setConsecutiveTurnsWithoutIntel(session.getConsecutiveTurnsWithoutIntel() + 1);
+        }
+        persistSession(sessionId, session);
     }
 
     /**
@@ -139,6 +174,8 @@ public class SessionStore {
 
             entity.setConversationHistory(mongoHistory);
             entity.setTurnCount(sessionData.getTurnCount());
+            entity.setLastIntelligenceTurn(sessionData.getLastIntelligenceTurn());
+            entity.setConsecutiveTurnsWithoutIntel(sessionData.getConsecutiveTurnsWithoutIntel());
             entity.setUpdatedAt(LocalDateTime.now());
 
             sessionRepository.save(entity);
@@ -155,6 +192,8 @@ public class SessionStore {
     private SessionData entityToSessionData(SessionEntity entity) {
         SessionData sessionData = new SessionData(entity.getSessionId());
         sessionData.setTurnCount(entity.getTurnCount());
+        sessionData.setLastIntelligenceTurn(entity.getLastIntelligenceTurn());
+        sessionData.setConsecutiveTurnsWithoutIntel(entity.getConsecutiveTurnsWithoutIntel());
 
         if (entity.getConversationHistory() != null) {
             List<ChatRequest.ConversationMessage> history = entity.getConversationHistory().stream()
@@ -182,20 +221,23 @@ public class SessionStore {
         private String sessionId;
         private List<ChatRequest.ConversationMessage> conversationHistory;
         private int turnCount;
+        private int lastIntelligenceTurn;
+        private int consecutiveTurnsWithoutIntel;
 
         public SessionData(String sessionId) {
             this.sessionId = sessionId;
             this.conversationHistory = new ArrayList<>();
             this.turnCount = 0;
+            this.lastIntelligenceTurn = 0;
+            this.consecutiveTurnsWithoutIntel = 0;
         }
 
         public void addMessage(String sender, String text) {
             conversationHistory
-                    .add(new ChatRequest.ConversationMessage(sender, text, java.time.Instant.now().toString()));
+                    .add(new ChatRequest.ConversationMessage(sender, text, System.currentTimeMillis()));
             if ("scammer".equals(sender) || "user".equals(sender)) {
                 turnCount++;
             }
         }
     }
 }
-

@@ -1,4 +1,5 @@
 package com.varutri.honeypot.service.llm;
+
 import com.varutri.honeypot.service.ai.PromptHardeningService;
 import com.varutri.honeypot.service.ai.ResponseValidationService;
 import com.varutri.honeypot.service.ai.ContextWindowManager;
@@ -292,7 +293,9 @@ public class OllamaService {
         if (managedHistory != null && !managedHistory.isEmpty()) {
             prompt.append("Previous conversation:\n");
             for (ChatRequest.ConversationMessage msg : managedHistory) {
-                String role = "user".equals(msg.getSender()) || "scammer".equals(msg.getSender())
+                // "scammer" is the external user (Them)
+                // "user" or "assistant" is the Honeypot (You)
+                String role = "scammer".equals(msg.getSender())
                         ? "Them"
                         : "You";
                 prompt.append(role).append(": ").append(msg.getText()).append("\n");
@@ -333,4 +336,3 @@ public class OllamaService {
         return 0;
     }
 }
-

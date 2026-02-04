@@ -16,7 +16,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -197,7 +196,7 @@ public class WhatsAppController {
             ChatRequest.Message msg = new ChatRequest.Message();
             msg.setSender("scammer");
             msg.setText(messageText);
-            msg.setTimestamp(LocalDateTime.now().toString());
+            msg.setTimestamp(System.currentTimeMillis());
             request.setMessage(msg);
 
             request.setConversationHistory(new ArrayList<>());

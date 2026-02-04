@@ -76,11 +76,11 @@ public class ChatRequest {
         private String text;
 
         /**
-         * Timestamp in ISO-8601 format
+         * Timestamp in Epoch format (ms)
          */
         @JsonProperty("timestamp")
-        @Size(max = 50, message = "Timestamp cannot exceed 50 characters")
-        private String timestamp;
+        @Min(value = 0, message = "Timestamp must be a valid epoch time in ms")
+        private Long timestamp;
     }
 
     /**
@@ -102,8 +102,8 @@ public class ChatRequest {
         private String text;
 
         @JsonProperty("timestamp")
-        @Size(max = 50, message = "Timestamp cannot exceed 50 characters")
-        private String timestamp;
+        @Min(value = 0, message = "Timestamp must be a valid epoch time in ms")
+        private Long timestamp;
     }
 
     /**

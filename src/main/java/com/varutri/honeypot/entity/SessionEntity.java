@@ -32,6 +32,10 @@ public class SessionEntity {
 
     private int turnCount;
 
+    private int lastIntelligenceTurn;
+
+    private int consecutiveTurnsWithoutIntel;
+
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
@@ -46,7 +50,7 @@ public class SessionEntity {
     public static class ConversationMessage {
         private String sender;
         private String text;
-        private String timestamp;
+        private Long timestamp;
     }
 
     /**
@@ -59,7 +63,7 @@ public class SessionEntity {
         conversationHistory.add(ConversationMessage.builder()
                 .sender(sender)
                 .text(text)
-                .timestamp(java.time.Instant.now().toString())
+                .timestamp(System.currentTimeMillis())
                 .build());
         if ("scammer".equals(sender) || "user".equals(sender)) {
             turnCount++;

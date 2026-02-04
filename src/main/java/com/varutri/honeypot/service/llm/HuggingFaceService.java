@@ -1,4 +1,5 @@
 package com.varutri.honeypot.service.llm;
+
 import com.varutri.honeypot.service.ai.PromptHardeningService;
 import com.varutri.honeypot.service.ai.ResponseValidationService;
 import com.varutri.honeypot.service.ai.ContextWindowManager;
@@ -224,20 +225,20 @@ public class HuggingFaceService {
         if (threatLevel >= 0.6) {
             // High threat - stalling responses
             fallbacks = new String[] {
-                    "Beta, my phone is giving some problem. Can you send that again?",
-                    "Sorry beta, I didn't understand. Can you explain again slowly?",
-                    "Arey, wait wait. Let me ask my son first. He knows about these things.",
-                    "One minute beta, I need to check something. Please wait.",
-                    "Hmm, my eyes are not so good today. What did you say?"
+                    "Sir, network is very slow here. Sending failed. Trying again...",
+                    "Wait, the UPI app is updating. Give me 2 minutes.",
+                    "I am trying to process the payment but it says server busy. One moment.",
+                    "Hold on, let me check my balance first.",
+                    "The details are not loading clearly. Can you send again?"
             };
         } else {
             // Normal responses
             fallbacks = new String[] {
-                    "Sorry beta, I didn't understand. Can you say that again?",
-                    "Acha? Tell me more about this.",
-                    "Hmm, I see. And what should I do?",
-                    "Ok beta, but I am a little confused...",
-                    "Really? That sounds interesting. Tell me more."
+                    "Okay, tell me exactly how to do this.",
+                    "I am interested. What is the next step?",
+                    "Share the details fast, I have free time now.",
+                    "Is there any joining fee? Please clarify.",
+                    "Okay, I am ready. Send the info."
             };
         }
 
@@ -453,7 +454,16 @@ public class HuggingFaceService {
         if (managedHistory != null && !managedHistory.isEmpty()) {
             for (ChatRequest.ConversationMessage msg : managedHistory) {
                 Message historyMsg = new Message();
-                historyMsg.setRole(msg.getSender());
+
+                // Map API roles to LLM roles
+                String role = msg.getSender();
+                if ("scammer".equals(role)) {
+                    role = "user";
+                } else if ("user".equals(role)) {
+                    role = "assistant";
+                }
+
+                historyMsg.setRole(role);
                 historyMsg.setContent(msg.getText());
                 messages.add(historyMsg);
             }
@@ -555,4 +565,3 @@ public class HuggingFaceService {
         private Message message;
     }
 }
-

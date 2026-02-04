@@ -1,4 +1,5 @@
 package com.varutri.honeypot.service.data;
+
 import com.varutri.honeypot.service.ai.InformationExtractor;
 import com.varutri.honeypot.service.ai.ScamDetector;
 import com.varutri.honeypot.service.ai.EnsembleThreatScorer;
@@ -53,7 +54,7 @@ public class EvidenceCollector {
      * Collect evidence from a conversation turn
      * Uses EnsembleThreatScorer for unified threat detection
      */
-    public void collectEvidence(String sessionId, String userMessage, String assistantReply) {
+    public boolean collectEvidence(String sessionId, String userMessage, String assistantReply) {
         EvidencePackage evidence = getOrCreateEvidence(sessionId);
 
         // Add conversation turn
@@ -67,7 +68,7 @@ public class EvidenceCollector {
         ExtractedInfo extracted = informationExtractor.extractInformation(userMessage);
 
         // Merge extracted info
-        mergeExtractedInfo(evidence.getExtractedInfo(), extracted);
+        boolean hasNewIntel = mergeExtractedInfo(evidence.getExtractedInfo(), extracted);
 
         // === UNIFIED ENSEMBLE THREAT SCORING ===
         EnsembleThreatScorer.ThreatAssessment assessment = ensembleThreatScorer.assessThreat(userMessage, null);
@@ -105,6 +106,8 @@ public class EvidenceCollector {
                 String.format("%.2f", assessment.ensembleScore),
                 String.format("%.0f", assessment.calibratedConfidence * 100),
                 assessment.triggeredLayers);
+
+        return hasNewIntel;
     }
 
     /**
@@ -265,10 +268,13 @@ public class EvidenceCollector {
     /**
      * Merge extracted information
      */
-    private void mergeExtractedInfo(ExtractedInfo target, ExtractedInfo source) {
+    private boolean mergeExtractedInfo(ExtractedInfo target, ExtractedInfo source) {
+        final boolean[] added = { false };
+
         source.getUpiIds().forEach(upi -> {
             if (!target.getUpiIds().contains(upi)) {
                 target.getUpiIds().add(upi);
+                added[0] = true;
             }
         });
         source.getPhoneNumbers().forEach(phone -> {
@@ -294,8 +300,11 @@ public class EvidenceCollector {
         source.getEmails().forEach(email -> {
             if (!target.getEmails().contains(email)) {
                 target.getEmails().add(email);
+                added[0] = true;
             }
         });
+
+        return added[0];
     }
 
     /**
@@ -333,6 +342,13 @@ public class EvidenceCollector {
         public boolean isHighThreat() {
             return "HIGH".equals(threatCategory) || "CRITICAL".equals(threatCategory);
         }
+
+        public boolean hasCriticalEvidence() {
+            return !extractedInfo.getUpiIds().isEmpty() ||
+                    !extractedInfo.getBankAccountNumbers().isEmpty() ||
+                    !extractedInfo.getPhoneNumbers().isEmpty() ||
+                    !extractedInfo.getUrls().isEmpty();
+        }
     }
 
     /**
@@ -347,4 +363,3 @@ public class EvidenceCollector {
         private String assistantReply;
     }
 }
-
