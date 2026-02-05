@@ -103,10 +103,23 @@ Automatically detects:
 
 ## Deployment
 
+### Local Development
 Use ngrok for public access:
 ```bash
 ngrok http 8080
 ```
+
+### Cloud Deployment
+
+#### Azure for Students (Recommended) 🚀
+Deploy to Azure with $100 free credit:
+```bash
+./deploy-to-azure.sh
+```
+See [AZURE_QUICKSTART.md](AZURE_QUICKSTART.md) for details.
+
+#### Render
+Already configured - push to GitHub and connect Render.
 
 ## Configuration
 
