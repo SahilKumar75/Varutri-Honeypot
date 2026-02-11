@@ -1,17 +1,5 @@
 # Varutri Honeypot
 
-**India AI Impact Buildathon - Problem 2: Agentic Honey-Pot**
-
-## Team Information
-
-**Team Name:** AITians
-
-**Team Members:**
-- **Sahil Kumar Singh** (Team Leader) - sahilkumargreat12@gmail.com
-- **Manu Rana** - mmbro1354@gmail.com
-
----
-
 ## Overview
 
 An AI-powered honeypot system that engages scammers in realistic conversations using a human persona, automatically extracts threat intelligence (UPI IDs, bank accounts, phone numbers, phishing URLs), detects scam patterns, and collects evidence for law enforcement.
@@ -69,25 +57,8 @@ Application starts on `http://localhost:8080`
 
 **Headers:**
 ```
-x-api-key: varutri_shield_2026
+x-api-key: Your_api_key
 Content-Type: application/json
-```
-
-**Request:**
-```json
-{
-  "sessionId": "session-id",
-  "message": "user message",
-  "conversationHistory": []
-}
-```
-
-**Response:**
-```json
-{
-  "status": "success",
-  "reply": "AI response"
-}
 ```
 
 ### GET /health
@@ -101,21 +72,8 @@ Automatically detects:
 - Bank accounts with IFSC codes
 - Phishing URLs
 
-## Deployment
-
-### Local Development
-Use ngrok for public access:
-```bash
-ngrok http 8080
-```
-
 ### Cloud Deployment
-
-#### Azure for Students (Recommended) 🚀
-Deploy to Azure with $100 free credit:
-```bash
-./deploy-to-azure.sh
-```
+Deploy to AWS or Azure with $100 free credit:
 See [AZURE_QUICKSTART.md](AZURE_QUICKSTART.md) for details.
 
 #### Render
@@ -126,15 +84,6 @@ Already configured - push to GitHub and connect Render.
 Key settings in `application.properties`:
 - `llm.provider`: `huggingface` or `ollama`
 - `huggingface.api-key`: Your HF API key
-- `varutri.api-key`: API key for requests (default: `varutri_shield_2026`)
+- `varutri.api-key`: API key for requests
 - `hackathon.callback-url`: GUVI callback endpoint
-- `varutri.session.max-turns`: Max conversation turns (default: 20)
-
-## Team
-
-- Lead Developer: SahilKumar75
-- Teammate: manurana26770
-
-## License
-
-Built for India AI Impact Buildathon 2026
+- `varutri.session.max-turns`: Max conversation turns (default: 40)
