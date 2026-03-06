@@ -69,11 +69,11 @@ public class WhatsAppController {
         log.info("Webhook verification request: mode={}, token={}", mode, token);
 
         if ("subscribe".equals(mode) && verifyToken.equals(token)) {
-            log.info("✅ Webhook verified successfully");
+            log.info(" Webhook verified successfully");
             // Meta expects the challenge string directly, not wrapped in JSON
             return ResponseEntity.ok(challenge);
         } else {
-            log.warn("❌ Webhook verification failed");
+            log.warn(" Webhook verification failed");
             return ApiResponse.forbidden("VERIFICATION_FAILED",
                     "Webhook verification failed").toResponseEntity();
         }
