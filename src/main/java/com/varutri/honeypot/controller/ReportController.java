@@ -1,7 +1,7 @@
 package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.dto.ScamReport;
-import com.varutri.honeypot.service.GovernmentReportService;
+import com.varutri.honeypot.service.core.GovernmentReportService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -127,3 +127,4 @@ public class ReportController {
                         "phishingUrls", totalUrls)));
     }
 }
+

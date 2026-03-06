@@ -2,7 +2,7 @@ package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.dto.ScamScenario;
 import com.varutri.honeypot.dto.SimulationResult;
-import com.varutri.honeypot.service.ScamSimulator;
+import com.varutri.honeypot.service.ai.ScamSimulator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -258,3 +258,4 @@ public class TestController {
                 .build();
     }
 }
+
