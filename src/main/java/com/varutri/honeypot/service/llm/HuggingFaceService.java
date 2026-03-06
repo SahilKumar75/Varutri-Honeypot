@@ -6,8 +6,6 @@ import com.varutri.honeypot.service.ai.ContextWindowManager;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.varutri.honeypot.dto.ChatRequest;
-import com.varutri.honeypot.dto.PhishingDetectionResponse;
-import com.varutri.honeypot.dto.PhishingDetectionResult;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -24,11 +22,13 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Service for communicating with Hugging Face APIs
- * - Chat Completions API for LLM responses
- * - Inference API for phishing detection
+ * Service for communicating with Hugging Face Chat Completions API.
  * 
- * Now integrated with PromptHardeningService for injection-resistant prompts
+ * Only handles LLM chat responses. All inference/classification tasks
+ * (phishing detection, embeddings, zero-shot) have been moved to
+ * LocalMLService for local execution via DJL.
+ * 
+ * Integrated with PromptHardeningService for injection-resistant prompts.
  */
 @Slf4j
 @Service
@@ -36,13 +36,11 @@ import java.util.List;
 public class HuggingFaceService {
 
     private final WebClient chatWebClient;
-    private final WebClient inferenceWebClient;
     private final String model;
-    private final String phishingModel;
     private final PersonaService personaService;
 
     @Autowired
-    @Lazy // Lazy to avoid circular dependency
+    @Lazy
     private PromptHardeningService promptHardeningService;
 
     @Autowired
@@ -59,27 +57,17 @@ public class HuggingFaceService {
     public HuggingFaceService(
             @Value("${huggingface.api-key}") String apiKey,
             @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String model,
-            @Value("${huggingface.phishing-model:cybersectony/phishing-email-detection-distilbert_v2.1}") String phishingModel,
             PersonaService personaService) {
         this.model = model;
-        this.phishingModel = phishingModel;
         this.personaService = personaService;
 
-        // WebClient for Chat Completions API (LLM)
         this.chatWebClient = WebClient.builder()
                 .baseUrl("https://router.huggingface.co/v1")
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
 
-        // WebClient for Inference API (Classification models)
-        this.inferenceWebClient = WebClient.builder()
-                .baseUrl("https://api-inference.huggingface.co")
-                .defaultHeader("Authorization", "Bearer " + apiKey)
-                .defaultHeader("Content-Type", "application/json")
-                .build();
-
-        log.info("Hugging Face service initialized with chat model: {} and phishing model: {}", model, phishingModel);
+        log.info("HuggingFaceService initialized — chat model: {} (inference moved to local DJL)", model);
         log.info("Using persona: {}", personaService.getPersonaSummary());
     }
 
@@ -251,99 +239,20 @@ public class HuggingFaceService {
     }
 
     /**
-     * Detect phishing content using the phishing detection model
-     * 
-     * @param text The text to analyze for phishing
-     * @return PhishingDetectionResult with detection outcome
-     */
-    public PhishingDetectionResult detectPhishing(String text) {
-        try {
-            return detectPhishingAsync(text).join();
-        } catch (Exception e) {
-            log.error("Error calling phishing detection model: {}", e.getMessage());
-            return PhishingDetectionResult.unknown();
-        }
-    }
-
-    /**
-     * Detect phishing content asynchronously
-     */
-    public java.util.concurrent.CompletableFuture<PhishingDetectionResult> detectPhishingAsync(String text) {
-        if (text == null || text.trim().isEmpty()) {
-            return java.util.concurrent.CompletableFuture.completedFuture(PhishingDetectionResult.unknown());
-        }
-
-        log.debug("Sending text to phishing detection model (Async): {}",
-                text.length() > 100 ? text.substring(0, 100) + "..." : text);
-
-        InferenceRequest request = new InferenceRequest(text);
-
-        return inferenceWebClient.post()
-                .uri("/models/" + phishingModel)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(
-                        new org.springframework.core.ParameterizedTypeReference<List<List<PhishingDetectionResponse.ClassificationResult>>>() {
-                        })
-                .timeout(Duration.ofSeconds(15))
-                .toFuture()
-                .thenApply(responseData -> {
-                    // Wrap in PhishingDetectionResponse for processing
-                    PhishingDetectionResponse response = new PhishingDetectionResponse(responseData);
-
-                    if (response.getTopResult() != null) {
-                        PhishingDetectionResponse.ClassificationResult topResult = response.getTopResult();
-                        String label = topResult.getLabel();
-                        double score = topResult.getScore();
-
-                        log.info("Phishing detection result - Label: {}, Score: {}", label,
-                                String.format("%.4f", score));
-
-                        if (response.isPhishing()) {
-                            return PhishingDetectionResult.phishing(score);
-                        } else {
-                            return PhishingDetectionResult.safe(score);
-                        }
-                    }
-
-                    log.warn("Empty or null response from phishing detection model");
-                    return PhishingDetectionResult.unknown();
-                })
-                .exceptionally(ex -> {
-                    log.error("Error calling phishing detection model: {}", ex.getMessage());
-                    return PhishingDetectionResult.unknown();
-                });
-    }
-
-    /**
      * Generate response asynchronously
      */
     public java.util.concurrent.CompletableFuture<String> generateResponseAsync(String userMessage,
             List<ChatRequest.ConversationMessage> conversationHistory,
             String scamType, double threatLevel) {
-
-        // For now, wrapping the synchronous logic in a supplyAsync
-        // Ideally, this should be fully reactive/async end-to-end, but the
-        // retry/validation logic is complex
-        // and currently implemented synchronously.
         return java.util.concurrent.CompletableFuture
                 .supplyAsync(() -> generateResponse(userMessage, conversationHistory, scamType, threatLevel));
     }
 
-    /**
-     * Check if a URL is potentially a phishing URL
-     */
-    public PhishingDetectionResult analyzeUrl(String url, String context) {
-        String analysisText = String.format("Check this URL: %s. Context: %s", url, context);
-        return detectPhishing(analysisText);
-    }
-
-    /**
-     * Analyze an email for phishing indicators
-     */
-    public PhishingDetectionResult analyzeEmail(String emailContent) {
-        return detectPhishing(emailContent);
-    }
+    // ========================================================================
+    // INFERENCE METHODS REMOVED
+    // Phishing detection, URL analysis, and email analysis have been
+    // moved to LocalMLService (runs locally via DJL, no API calls).
+    // ========================================================================
 
     /**
      * Build chat completion request with hardened prompts
@@ -511,14 +420,7 @@ public class HuggingFaceService {
         return 0;
     }
 
-    // Request DTO for Inference API
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class InferenceRequest {
-        @JsonProperty("inputs")
-        private String inputs;
-    }
+    // InferenceRequest DTO removed — inference now handled by LocalMLService
 
     // Chat Completions API Request/Response classes
     @Data

@@ -1,5 +1,6 @@
 package com.varutri.honeypot.service.ai;
-import com.varutri.honeypot.service.llm.HuggingFaceService;
+
+import com.varutri.honeypot.service.ml.LocalMLService;
 
 import com.varutri.honeypot.dto.PhishingDetectionResult;
 import lombok.extern.slf4j.Slf4j;
@@ -36,9 +37,9 @@ public class ScamDetector {
     @Autowired(required = false)
     private SemanticScamAnalyzer semanticScamAnalyzer;
 
-    // Optional HuggingFace service for AI-powered phishing detection
+    // Local ML service for AI-powered phishing detection
     @Autowired(required = false)
-    private HuggingFaceService huggingFaceService;
+    private LocalMLService localMLService;
 
     // Cache for AI detection result to avoid duplicate calls
     private final ThreadLocal<PhishingDetectionResult> cachedAiResult = new ThreadLocal<>();
@@ -202,10 +203,10 @@ public class ScamDetector {
             return cached;
         }
 
-        // Call AI service if available
-        if (huggingFaceService != null) {
+        // Call local ML service if available
+        if (localMLService != null && localMLService.isAvailable()) {
             try {
-                PhishingDetectionResult result = huggingFaceService.detectPhishing(message);
+                PhishingDetectionResult result = localMLService.detectPhishing(message);
                 cachedAiResult.set(result);
                 return result;
             } catch (Exception e) {
@@ -390,7 +391,6 @@ public class ScamDetector {
      * Check if AI phishing detection is available
      */
     public boolean isAiDetectionAvailable() {
-        return huggingFaceService != null;
+        return localMLService != null && localMLService.isAvailable();
     }
 }
-

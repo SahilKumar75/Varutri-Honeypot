@@ -1,14 +1,15 @@
 package com.varutri.honeypot.service.ai;
-import com.varutri.honeypot.service.llm.HuggingFaceService;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.varutri.honeypot.service.llm.HuggingFaceService;
+import com.varutri.honeypot.service.ml.LocalMLService;
+
 import com.varutri.honeypot.dto.ChatRequest;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -23,27 +24,25 @@ import java.util.concurrent.Executors;
  * Semantic Scam Analyzer Service - Phase 3 ML Analysis
  * 
  * Implements sophisticated ML-based scam detection:
- * 1. Sentence Embeddings using all-MiniLM-L6-v2
+ * 1. Sentence Embeddings using local MiniLM (via DJL)
  * 2. Semantic Similarity to known scam patterns
- * 3. Intent Detection and Classification
- * 4. LLM-based Contextual Analysis
- * 5. Manipulation Tactics Detection
+ * 3. Intent Detection using local DeBERTa (via DJL)
+ * 4. LLM-based Contextual Analysis (via HF Chat API)
+ * 5. Manipulation Tactics Detection using local DeBERTa
  * 6. Multi-turn Conversation Context Understanding
  *
- * Optimized for performance using parallel execution.
+ * Embeddings and classification run locally — no external inference API calls.
+ * Only the LLM contextual analysis uses the HF Chat Completions API.
  */
 @Slf4j
 @Service
-@ConditionalOnProperty(name = "llm.provider", havingValue = "huggingface")
 public class SemanticScamAnalyzer {
 
-    private final WebClient inferenceWebClient;
+    private final LocalMLService localMLService;
     private final WebClient chatWebClient;
-    private final String embeddingModel;
-    private final String classificationModel;
     private final String llmModel;
 
-    // Virtual threads for IO-bound ML tasks (Java 21+) or cached pool
+    // Thread pool for parallel ML tasks
     private final ExecutorService executorService = Executors.newCachedThreadPool();
 
     // Known scam patterns for semantic matching
@@ -110,21 +109,14 @@ public class SemanticScamAnalyzer {
             "scarcity tactics",
             "trust building with personal details");
 
+    @Autowired
     public SemanticScamAnalyzer(
+            LocalMLService localMLService,
             @Value("${huggingface.api-key}") String apiKey,
-            @Value("${huggingface.embedding-model:sentence-transformers/all-MiniLM-L6-v2}") String embeddingModel,
-            @Value("${huggingface.intent-model:facebook/bart-large-mnli}") String classificationModel,
             @Value("${huggingface.model:meta-llama/Llama-3.3-70B-Instruct}") String llmModel) {
 
-        this.embeddingModel = embeddingModel;
-        this.classificationModel = classificationModel;
+        this.localMLService = localMLService;
         this.llmModel = llmModel;
-
-        this.inferenceWebClient = WebClient.builder()
-                .baseUrl("https://api-inference.huggingface.co")
-                .defaultHeader("Authorization", "Bearer " + apiKey)
-                .defaultHeader("Content-Type", "application/json")
-                .build();
 
         this.chatWebClient = WebClient.builder()
                 .baseUrl("https://router.huggingface.co/v1")
@@ -132,13 +124,12 @@ public class SemanticScamAnalyzer {
                 .defaultHeader("Content-Type", "application/json")
                 .build();
 
-        log.info("SemanticScamAnalyzer initialized with embedding model: {}", embeddingModel);
+        log.info("SemanticScamAnalyzer initialized with LOCAL ML models (MiniLM + DeBERTa)");
     }
 
     @PostConstruct
     public void initialize() {
         log.info("Pre-computing embeddings for {} scam pattern categories...", SCAM_PATTERNS.size());
-        // Note: In production, you'd precompute these and cache them
     }
 
     // ========================================================================
@@ -219,36 +210,27 @@ public class SemanticScamAnalyzer {
     // ========================================================================
 
     private CompletableFuture<Map<String, Double>> computeSemanticSimilarity(String message) {
-        return getEmbedding(message).thenApplyAsync(messageEmbedding -> {
+        return CompletableFuture.supplyAsync(() -> {
             Map<String, Double> similarities = new HashMap<>();
 
-            if (messageEmbedding == null) {
+            // Get message embedding locally using MiniLM
+            float[] messageEmbedding = localMLService.getEmbedding(message);
+            if (messageEmbedding == null || isZeroVector(messageEmbedding)) {
                 return similarities;
             }
 
-            // This part is CPU bound, run in thread pool
             try {
-                // In a real system, pattern embeddings should be cached
-                // For now, we compute them sequentially which is suboptimal but safe
-                // Ideally, we'd fetch precomputed embeddings
-
-                // NOTE: Fetching pattern embeddings is slow if not cached.
-                // For high performance, this needs pre-computation.
-                // Optimizing: only check patterns if we have valid message embedding
-
                 for (Map.Entry<String, List<String>> entry : SCAM_PATTERNS.entrySet()) {
                     String category = entry.getKey();
                     double maxSimilarity = 0.0;
 
-                    // Limit patterns to check for performance
                     int checks = 0;
                     for (String pattern : entry.getValue()) {
                         if (checks++ > 3)
-                            break; // Optimization: check only top 3 patterns per category
+                            break;
 
-                        // Blocking call here on purpose for simplicity as we are inside async wrapper
-                        // Ideally this should be fully async too
-                        float[] patternEmbedding = getEmbeddingSync(pattern);
+                        // Local embedding — ~5ms per call, no network
+                        float[] patternEmbedding = localMLService.getEmbedding(pattern);
 
                         if (patternEmbedding != null) {
                             double similarity = cosineSimilarity(messageEmbedding, patternEmbedding);
@@ -268,24 +250,12 @@ public class SemanticScamAnalyzer {
         }, executorService);
     }
 
-    private CompletableFuture<float[]> getEmbedding(String text) {
-        EmbeddingRequest request = new EmbeddingRequest(text);
-        return inferenceWebClient.post()
-                .uri("/models/" + embeddingModel)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(float[].class)
-                .timeout(Duration.ofSeconds(10))
-                .toFuture(); // Convert Mono to CompletableFuture
-    }
-
-    // Sync version for internal loop use (blocks ONLY the worker thread)
-    private float[] getEmbeddingSync(String text) {
-        try {
-            return getEmbedding(text).get();
-        } catch (Exception e) {
-            return null;
+    private boolean isZeroVector(float[] vec) {
+        for (float v : vec) {
+            if (v != 0.0f)
+                return false;
         }
+        return true;
     }
 
     private double cosineSimilarity(float[] a, float[] b) {
@@ -309,44 +279,30 @@ public class SemanticScamAnalyzer {
     // ========================================================================
 
     private CompletableFuture<List<IntentScore>> classifyIntent(String message) {
-        List<String> candidateLabels = Arrays.asList(
-                "requesting money or payment", "creating urgency or fear",
-                "offering too-good-to-be-true deals", "impersonating authority or company",
-                "asking for personal information", "building romantic relationship",
-                "offering job opportunity", "claiming prize or lottery win",
-                "legitimate business communication", "friendly casual conversation");
+        return CompletableFuture.supplyAsync(() -> {
+            List<String> candidateLabels = Arrays.asList(
+                    "requesting money or payment", "creating urgency or fear",
+                    "offering too-good-to-be-true deals", "impersonating authority or company",
+                    "asking for personal information", "building romantic relationship",
+                    "offering job opportunity", "claiming prize or lottery win",
+                    "legitimate business communication", "friendly casual conversation");
 
-        ZeroShotRequest request = new ZeroShotRequest();
-        request.inputs = message;
-        request.parameters = new ZeroShotParameters();
-        request.parameters.candidateLabels = candidateLabels;
-        request.parameters.multiLabel = true;
+            // Local DeBERTa zero-shot classification — no network call
+            Map<String, Double> scores = localMLService.classifyZeroShot(message, candidateLabels);
 
-        return inferenceWebClient.post()
-                .uri("/models/" + classificationModel)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(ZeroShotResponse.class)
-                .timeout(Duration.ofSeconds(15))
-                .toFuture()
-                .thenApply(response -> {
-                    List<IntentScore> intents = new ArrayList<>();
-                    if (response != null && response.labels != null) {
-                        for (int i = 0; i < response.labels.size(); i++) {
-                            String label = response.labels.get(i);
-                            double score = response.scores.get(i);
-                            if (score > 0.3) {
-                                IntentScore intent = new IntentScore();
-                                intent.intent = label;
-                                intent.confidence = score;
-                                intent.isSuspicious = isSuspiciousIntent(label);
-                                intents.add(intent);
-                            }
-                        }
-                    }
-                    intents.sort((a, b) -> Double.compare(b.confidence, a.confidence));
-                    return intents;
-                });
+            List<IntentScore> intents = new ArrayList<>();
+            for (Map.Entry<String, Double> entry : scores.entrySet()) {
+                if (entry.getValue() > 0.3) {
+                    IntentScore intent = new IntentScore();
+                    intent.intent = entry.getKey();
+                    intent.confidence = entry.getValue();
+                    intent.isSuspicious = isSuspiciousIntent(entry.getKey());
+                    intents.add(intent);
+                }
+            }
+            intents.sort((a, b) -> Double.compare(b.confidence, a.confidence));
+            return intents;
+        }, executorService);
     }
 
     private boolean isSuspiciousIntent(String intent) {
@@ -361,37 +317,23 @@ public class SemanticScamAnalyzer {
     // ========================================================================
 
     private CompletableFuture<List<ManipulationTactic>> detectManipulationTactics(String message) {
-        ZeroShotRequest request = new ZeroShotRequest();
-        request.inputs = message;
-        request.parameters = new ZeroShotParameters();
-        request.parameters.candidateLabels = MANIPULATION_TACTICS;
-        request.parameters.multiLabel = true;
+        return CompletableFuture.supplyAsync(() -> {
+            // Local DeBERTa zero-shot classification — no network call
+            Map<String, Double> scores = localMLService.classifyZeroShot(message, MANIPULATION_TACTICS);
 
-        return inferenceWebClient.post()
-                .uri("/models/" + classificationModel)
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(ZeroShotResponse.class)
-                .timeout(Duration.ofSeconds(15))
-                .toFuture()
-                .thenApply(response -> {
-                    List<ManipulationTactic> tactics = new ArrayList<>();
-                    if (response != null && response.labels != null) {
-                        for (int i = 0; i < response.labels.size(); i++) {
-                            String label = response.labels.get(i);
-                            double score = response.scores.get(i);
-                            if (score > 0.4) {
-                                ManipulationTactic tactic = new ManipulationTactic();
-                                tactic.tactic = label;
-                                tactic.confidence = score;
-                                tactic.severity = calculateSeverity(label, score);
-                                tactics.add(tactic);
-                            }
-                        }
-                    }
-                    tactics.sort((a, b) -> Double.compare(b.confidence, a.confidence));
-                    return tactics;
-                });
+            List<ManipulationTactic> tactics = new ArrayList<>();
+            for (Map.Entry<String, Double> entry : scores.entrySet()) {
+                if (entry.getValue() > 0.4) {
+                    ManipulationTactic tactic = new ManipulationTactic();
+                    tactic.tactic = entry.getKey();
+                    tactic.confidence = entry.getValue();
+                    tactic.severity = calculateSeverity(entry.getKey(), entry.getValue());
+                    tactics.add(tactic);
+                }
+            }
+            tactics.sort((a, b) -> Double.compare(b.confidence, a.confidence));
+            return tactics;
+        }, executorService);
     }
 
     private String calculateSeverity(String tactic, double confidence) {
@@ -556,40 +498,8 @@ public class SemanticScamAnalyzer {
     }
 
     // ========================================================================
-    // DTOs
+    // DTOs (HF-specific DTOs removed — local ML handles formats internally)
     // ========================================================================
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class EmbeddingRequest {
-        @JsonProperty("inputs")
-        private String inputs;
-    }
-
-    @Data
-    public static class ZeroShotRequest {
-        @JsonProperty("inputs")
-        public String inputs;
-        @JsonProperty("parameters")
-        public ZeroShotParameters parameters;
-    }
-
-    @Data
-    public static class ZeroShotParameters {
-        @JsonProperty("candidate_labels")
-        public List<String> candidateLabels;
-        @JsonProperty("multi_label")
-        public boolean multiLabel;
-    }
-
-    @Data
-    public static class ZeroShotResponse {
-        @JsonProperty("labels")
-        public List<String> labels;
-        @JsonProperty("scores")
-        public List<Double> scores;
-    }
 
     @Data
     public static class SemanticAnalysisResult {
@@ -631,4 +541,3 @@ public class SemanticScamAnalyzer {
         public String error;
     }
 }
-

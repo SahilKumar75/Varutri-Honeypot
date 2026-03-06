@@ -1,6 +1,6 @@
 package com.varutri.honeypot.service.ai;
 
-import com.varutri.honeypot.service.llm.HuggingFaceService;
+import com.varutri.honeypot.service.ml.LocalMLService;
 
 import com.varutri.honeypot.dto.ChatRequest;
 import com.varutri.honeypot.dto.PhishingDetectionResult;
@@ -42,7 +42,7 @@ public class EnsembleThreatScorer {
     private SemanticScamAnalyzer semanticScamAnalyzer;
 
     @Autowired(required = false)
-    private HuggingFaceService huggingFaceService;
+    private LocalMLService localMLService;
 
     // ========================================================================
     // LAYER WEIGHTS (should sum to ~1.0 for base scoring)
@@ -157,9 +157,10 @@ public class EnsembleThreatScorer {
         // LAYER 5: AI Phishing Model (I/O Bound - Async)
         // ========================================
         java.util.concurrent.CompletableFuture<Void> aiFuture;
-        if (huggingFaceService != null) {
-            aiFuture = huggingFaceService.detectPhishingAsync(message)
-                    .thenAccept(aiResult -> {
+        if (localMLService != null && localMLService.isAvailable()) {
+            aiFuture = java.util.concurrent.CompletableFuture
+                    .runAsync(() -> {
+                        PhishingDetectionResult aiResult = localMLService.detectPhishing(message);
                         LayerResult result = new LayerResult();
                         result.layerName = "AI_PHISHING_MODEL";
                         result.weight = WEIGHT_AI_MODEL;
@@ -420,14 +421,14 @@ public class EnsembleThreatScorer {
         result.layerName = "AI_PHISHING_MODEL";
         result.weight = WEIGHT_AI_MODEL;
 
-        if (huggingFaceService == null) {
+        if (localMLService == null || !localMLService.isAvailable()) {
             result.details = "AI model not available";
             result.rawScore = 0.0;
             return result;
         }
 
         try {
-            PhishingDetectionResult aiResult = huggingFaceService.detectPhishing(message);
+            PhishingDetectionResult aiResult = localMLService.detectPhishing(message);
 
             if (aiResult != null) {
                 result.rawScore = aiResult.isPhishing() ? aiResult.getConfidence() : 0.0;
@@ -441,7 +442,7 @@ public class EnsembleThreatScorer {
                     result.detectedType = "PHISHING";
                 }
 
-                result.details = String.format("Model: DistilBERT, Label: %s, Confidence: %.2f",
+                result.details = String.format("Model: DeBERTa (local), Label: %s, Confidence: %.2f",
                         aiResult.getLabel(), aiResult.getConfidence());
             } else {
                 result.details = "AI model returned null result";

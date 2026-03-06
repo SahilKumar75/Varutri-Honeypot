@@ -1,7 +1,6 @@
 package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.service.security.InputSanitizer;
-import com.varutri.honeypot.service.llm.OllamaService;
 import com.varutri.honeypot.service.core.GovernmentReportService;
 import com.varutri.honeypot.service.data.SessionStore;
 import com.varutri.honeypot.service.core.CallbackService;
@@ -38,9 +37,6 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api")
 public class HoneypotController {
-
-    @Autowired
-    private Optional<OllamaService> ollamaService;
 
     @Autowired
     private Optional<HuggingFaceService> huggingFaceService;
@@ -208,12 +204,10 @@ public class HoneypotController {
         if (huggingFaceService.isPresent()) {
             return huggingFaceService.get().generateResponseAsync(userMessage, conversationHistory, scamType,
                     threatLevel);
-        } else if (ollamaService.isPresent()) {
-            return ollamaService.get().generateResponseAsync(userMessage, conversationHistory, scamType, threatLevel);
         } else {
             return java.util.concurrent.CompletableFuture.failedFuture(
                     new IllegalStateException(
-                            "No LLM service configured. Please set llm.provider to 'ollama' or 'huggingface'"));
+                            "No LLM service configured. Please set llm.provider to 'huggingface'"));
         }
     }
 
@@ -229,8 +223,7 @@ public class HoneypotController {
                 "status", "healthy",
                 "service", "varutri-honeypot",
                 "llmProvider", llmProvider,
-                "huggingFaceAvailable", huggingFaceService.isPresent(),
-                "ollamaAvailable", ollamaService.isPresent());
+                "huggingFaceAvailable", huggingFaceService.isPresent());
 
         return ApiResponse.ok(healthData, "Service is healthy");
     }

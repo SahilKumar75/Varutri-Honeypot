@@ -110,6 +110,28 @@
             <artifactId>commons-text</artifactId>
             <version>1.11.0</version>
         </dependency>
+        
+        <!-- Deep Java Library (DJL) - Core API -->
+        <dependency>
+            <groupId>ai.djl</groupId>
+            <artifactId>api</artifactId>
+            <version>0.26.0</version>
+        </dependency>
+        
+        <!-- DJL PyTorch Engine -->
+        <dependency>
+            <groupId>ai.djl.pytorch</groupId>
+            <artifactId>pytorch-engine</artifactId>
+            <version>0.26.0</version>
+            <scope>runtime</scope>
+        </dependency>
+        
+        <!-- DJL Hugging Face Tokenizers -->
+        <dependency>
+            <groupId>ai.djl.huggingface</groupId>
+            <artifactId>tokenizers</artifactId>
+            <version>0.26.0</version>
+        </dependency>
     </dependencies>
 
     
