@@ -1,0 +1,50 @@
+name: Build and Quality Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Compile backend
+        run: mvn -B -DskipTests compile
+
+  quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Frontend and extension syntax checks
+        run: |
+          node --check frontend/app.js
+          node --check consumer_extension/background.js
+          node --check consumer_extension/content.js
+          node --check consumer_extension/popup.js
+
+      - name: Shell script syntax checks
+        run: |
+          bash -n test-api.sh
+          bash -n test-scam-simulation.sh
+
+      - name: Docker Compose configuration check
+        run: docker compose config >/dev/null

@@ -131,6 +131,7 @@ See [AZURE_QUICKSTART.md](AZURE_QUICKSTART.md) for details.
 
 - Flutter consumer shell: [consumer_app/README.md](consumer_app/README.md)
 - Browser extension shell: [consumer_extension/README.md](consumer_extension/README.md)
+- Web command center: [frontend/README.md](frontend/README.md)
 - HLD/LLD and flow architecture: [CONSUMER_ARCHITECTURE.md](CONSUMER_ARCHITECTURE.md)
 
 #### Render
@@ -142,5 +143,16 @@ Key settings in `application.properties`:
 - `llm.provider`: `huggingface` or `ollama`
 - `huggingface.api-key`: Your HF API key
 - `varutri.api-key`: API key for requests
+- `consumer.cache.backend`: `MEMORY`, `REDIS`, or `HYBRID`
+- `spring.data.redis.*`: Redis host/port/password/database for distributed cache mode
+- `spring.data.redis.ssl.enabled`: Toggle TLS for managed Redis providers
 - `hackathon.callback-url`: GUVI callback endpoint
 - `varutri.session.max-turns`: Max conversation turns (default: 40)
+
+## Production Cache Checklist
+
+- Set `CONSUMER_CACHE_BACKEND=REDIS` (or `HYBRID` for local fallback mode).
+- Configure `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, and optional `REDIS_USERNAME`.
+- For managed Redis over TLS set `REDIS_SSL_ENABLED=true`.
+- Cache operation metrics are exported via actuator metric key:
+	- `varutri.consumer.cache.operations`

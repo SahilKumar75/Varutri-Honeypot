@@ -18,6 +18,17 @@ mvn clean package -DskipTests
 java -jar target/honeypot-1.0.0.jar
 ```
 
+Optional Redis cache mode for horizontal scale:
+
+```bash
+docker compose up -d redis
+export CONSUMER_CACHE_BACKEND=REDIS
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+export REDIS_PASSWORD=change_me
+export REDIS_SSL_ENABLED=false
+```
+
 ## Testing the API
 
 ```bash
@@ -90,4 +101,18 @@ Provide the ngrok HTTPS URL to GUVI platform.
 - All code pushed to: https://github.com/SahilKumar75/Varutri-Honeypot
 - Consumer app shell: `consumer_app/`
 - Browser extension shell: `consumer_extension/`
+- Web command center: `frontend/`
 - HLD/LLD + flow architecture doc: `CONSUMER_ARCHITECTURE.md`
+
+Open the web command center:
+
+```bash
+cd frontend
+open index.html
+```
+
+CI pipeline is available in `.github/workflows/ci.yml` and runs:
+- `mvn -DskipTests compile`
+- JS syntax checks for frontend and extension
+- shell script syntax checks
+- Docker Compose config validation

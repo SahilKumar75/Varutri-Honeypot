@@ -15,6 +15,7 @@ Channels in MVP:
 Client surfaces:
 - Flutter mobile app shell (`consumer_app`)
 - Browser extension shell (`consumer_extension`)
+- Web command center (`frontend`)
 
 Server surface:
 - Spring Boot consumer APIs under `/api/consumer/**`
@@ -22,30 +23,30 @@ Server surface:
 ## 2) HLD (High-Level Design)
 
 ```text
-+-----------------------+      +-----------------------+
-| Flutter Consumer App  |      | Browser Extension     |
-| - capture/share flow  |      | - active tab analysis |
-| - risk presence UI    |      | - page risk banner    |
-+-----------+-----------+      +-----------+-----------+
-            |                              |
-            | Bearer token + payload       | Bearer token + payload
-            +---------------+--------------+
-                            |
-                            v
-                 +--------------------------+
-                 | Spring Boot Consumer API |
-                 | /auth /analyze /history  |
-                 | /capabilities            |
-                 +------------+-------------+
-                              |
-           +------------------+-------------------+
-           |                                      |
-           v                                      v
-+------------------------+              +------------------------+
-| Threat + Extraction    |              | Session + Evidence DB  |
-| ensemble scorer        |              | Mongo repositories     |
-| info extractor         |              | history and detail     |
-+------------------------+              +------------------------+
++-----------------------+      +-----------------------+      +-----------------------+
+| Flutter Consumer App  |      | Browser Extension     |      | Web Command Center    |
+| - capture/share flow  |      | - active tab analysis |      | - ops and drill-down  |
+| - risk presence UI    |      | - page risk banner    |      | - manual triage flow  |
++-----------+-----------+      +-----------+-----------+      +-----------+-----------+
+    |                              |                              |
+    | Bearer token + payload       | Bearer token + payload       | Bearer token + payload
+    +---------------+--------------+--------------+---------------+
+                |
+                v
+             +--------------------------+
+             | Spring Boot Consumer API |
+             | /auth /analyze /history  |
+             | /capabilities            |
+             +------------+-------------+
+                  |
+         +----------------------------+----------------------------+
+         |                                                         |
+         v                                                         v
+  +------------------------+                               +------------------------+
+  | Threat + Extraction    |                               | Session + Evidence DB  |
+  | ensemble scorer        |                               | Mongo repositories     |
+  | info extractor         |                               | history and detail     |
+  +------------------------+                               +------------------------+
 ```
 
 ## 3) LLD (Low-Level Design)
@@ -107,6 +108,15 @@ Server surface:
 - `popup.js`
   - Management panel for config + action flow.
 
+### 3.4 Client Components (Web Command Center)
+
+- `frontend/index.html`
+  - End-to-end flow board for token, analysis, history, capabilities, and detail.
+- `frontend/app.js`
+  - API integration, state management, and client-side TTL cache.
+- `frontend/style.css`
+  - Responsive on-screen risk presence and flow-oriented visual system.
+
 ## 4) Flow Structures
 
 ### 4.1 Flow A: Token Provisioning
@@ -142,17 +152,21 @@ Server surface:
 
 ### 5.1 Server-Side Cache
 
-Current implementation (in-memory TTL):
+Current implementation (backend-selectable TTL cache):
+- Backend mode: `consumer.cache.backend=MEMORY|REDIS|HYBRID`
+- Cache key prefix: `consumer.cache.key-prefix`
 - History list TTL: `consumer.cache.history.ttl-seconds` (default 45)
 - History detail TTL: same history TTL bucket
 - Capability TTL: `consumer.cache.capabilities.ttl-seconds` (default 300)
+- Redis connection (when backend uses Redis): `spring.data.redis.*`
 
 Invalidation policy:
-- On new analysis write, clear history list cache and matching session detail key.
+- On new analysis write, cache service increments distributed history cache version.
+- New keys are generated under the next history version to invalidate stale entries across instances.
 
-Production recommendation:
-- Move to Redis for horizontal scale.
-- Add cache metrics (`hit`, `miss`, `eviction`) and alerts.
+Operational note:
+- Redis failures gracefully degrade to in-memory fallback so API flow remains available.
+- Cache metrics (`hit`, `miss`, `write`, `invalidate`, `fallback`) are emitted under `varutri.consumer.cache.operations`.
 
 ### 5.2 Client-Side Cache
 
@@ -193,8 +207,8 @@ On-screen presence is always derived from latest threat output:
 
 Release tracks:
 1. Track A (complete): Consumer API + token + history + capability matrix.
-2. Track B (in progress): Rich client flows + extension shell + risk presence.
-3. Track C: Native capture modules and provider integrations (SMS roles, Call screening, OAuth email).
+2. Track B (complete): Flutter state flow + extension shell + web command center + risk presence.
+3. Track C (in progress): Native capture modules and provider integrations (SMS roles, Call screening, OAuth email).
 
 Runbook checks per release:
 - API token issuance smoke test
@@ -210,7 +224,6 @@ SLO targets (initial):
 
 ## 9) Next Engineering Steps
 
-- Add Redis-backed cache implementation behind `ConsumerCacheService` interface.
-- Add telemetry: request IDs, cache metrics, per-channel latency.
+- Add telemetry: request IDs and per-channel latency traces.
 - Introduce persistent risk feed stream for real-time app/extension presence.
-- Add CI checks for extension lint + Flutter static analysis once toolchains are available in CI image.
+- Expand CI with Flutter static analysis once Flutter SDK is available in CI image.

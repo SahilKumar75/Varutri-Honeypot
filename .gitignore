@@ -31,6 +31,11 @@ build/
 ### VS Code ###
 .vscode/
 
+### Tooling metadata ###
+.agent/
+.claude/
+.kiro/
+
 ### Mac ###
 .DS_Store
 
