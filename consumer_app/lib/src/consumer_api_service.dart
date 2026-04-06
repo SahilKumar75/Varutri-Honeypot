@@ -9,7 +9,7 @@ class ConsumerApiService {
 
   final String baseUrl;
 
-  Future<String> issueToken({
+  Future<ConsumerAuthToken> issueToken({
     required String appId,
     required String deviceId,
     required String platform,
@@ -32,17 +32,17 @@ class ConsumerApiService {
     }
 
     final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final data = payload['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
-    final token = (data['accessToken'] ?? '').toString();
-    if (token.isEmpty) {
+    final authToken = ConsumerAuthToken.fromApiResponse(payload);
+    if (authToken.accessToken.isEmpty) {
       throw Exception('Token missing in response');
     }
-    return token;
+    return authToken;
   }
 
   Future<ConsumerAnalysis> analyze({
     required String token,
     required String channel,
+    required String platform,
     required String text,
     String senderId = '',
     String url = '',
@@ -62,7 +62,7 @@ class ConsumerApiService {
           if (url.isNotEmpty) 'url': url,
         },
         'metadata': {
-          'platform': 'ANDROID',
+          'platform': platform,
           'sourceApp': 'consumer_app_shell',
           'locale': 'en_IN',
         },
@@ -98,5 +98,45 @@ class ConsumerApiService {
     return data
         .map((item) => ConsumerHistoryItem.fromJson(item as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<ConsumerHistoryDetail> historyDetail({
+    required String token,
+    required String sessionId,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/consumer/history/$sessionId');
+    final response = await http.get(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('History detail failed: ${response.statusCode} ${response.body}');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return ConsumerHistoryDetail.fromApiResponse(payload);
+  }
+
+  Future<ConsumerCapabilities> capabilities({
+    required String token,
+    required String platform,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/consumer/capabilities?platform=$platform');
+    final response = await http.get(
+      uri,
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Capabilities failed: ${response.statusCode} ${response.body}');
+    }
+
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    return ConsumerCapabilities.fromApiResponse(payload);
   }
 }

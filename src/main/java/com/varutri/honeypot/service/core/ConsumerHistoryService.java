@@ -29,10 +29,15 @@ public class ConsumerHistoryService {
     private final SessionRepository sessionRepository;
     private final EvidenceRepository evidenceRepository;
     private final InputSanitizer inputSanitizer;
+    private final ConsumerCacheService consumerCacheService;
 
     public List<ConsumerHistoryItemResponse> getRecentHistory(int requestedLimit) {
         int limit = Math.max(1, Math.min(requestedLimit, 100));
 
+        return consumerCacheService.getOrLoadHistoryList(limit, () -> loadRecentHistory(limit));
+    }
+
+    private List<ConsumerHistoryItemResponse> loadRecentHistory(int limit) {
         return sessionRepository.findAll().stream()
                 .filter(this::isConsumerSession)
                 .sorted(Comparator.comparing(SessionEntity::getUpdatedAt,
@@ -44,6 +49,11 @@ public class ConsumerHistoryService {
 
     public ConsumerHistoryDetailResponse getHistoryDetail(String sessionId) {
         String safeSessionId = inputSanitizer.sanitizeSessionId(sessionId);
+
+        return consumerCacheService.getOrLoadHistoryDetail(safeSessionId, () -> loadHistoryDetail(safeSessionId));
+    }
+
+    private ConsumerHistoryDetailResponse loadHistoryDetail(String safeSessionId) {
 
         SessionEntity session = sessionRepository.findBySessionId(safeSessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Consumer session", safeSessionId));

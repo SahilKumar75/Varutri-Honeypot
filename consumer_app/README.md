@@ -7,6 +7,10 @@ This is a starter Flutter shell for consumer-side scam reporting and analysis.
 - Token exchange: POST /api/consumer/auth/token
 - Consumer analysis: POST /api/consumer/analyze
 - Consumer history: GET /api/consumer/history
+- Consumer history detail: GET /api/consumer/history/{sessionId}
+- Consumer capabilities: GET /api/consumer/capabilities
+- On-screen risk presence states: Idle, Safe, Watch, Danger
+- In-app state management with TTL caching for history/capabilities
 
 ## Run locally
 
@@ -25,5 +29,5 @@ Change Base URL in the UI when needed.
 
 ## Notes
 
-- This is an integration shell, not a production UI.
+- This is an integration shell with flow-structured screens, not a production UI.
 - iOS/Android platform-specific capture modules should be added in later iterations.

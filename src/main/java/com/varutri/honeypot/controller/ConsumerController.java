@@ -2,9 +2,11 @@ package com.varutri.honeypot.controller;
 
 import com.varutri.honeypot.dto.ApiResponse;
 import com.varutri.honeypot.dto.ConsumerAnalysisResponse;
+import com.varutri.honeypot.dto.ConsumerCapabilitiesResponse;
 import com.varutri.honeypot.dto.ConsumerHistoryDetailResponse;
 import com.varutri.honeypot.dto.ConsumerHistoryItemResponse;
 import com.varutri.honeypot.dto.ConsumerSignalRequest;
+import com.varutri.honeypot.service.core.ConsumerCapabilitiesService;
 import com.varutri.honeypot.service.core.ConsumerHistoryService;
 import com.varutri.honeypot.service.core.ConsumerSignalService;
 import jakarta.validation.Valid;
@@ -33,6 +35,7 @@ public class ConsumerController {
 
     private final ConsumerSignalService consumerSignalService;
     private final ConsumerHistoryService consumerHistoryService;
+    private final ConsumerCapabilitiesService consumerCapabilitiesService;
 
     /**
      * Analyze a suspicious signal reported by a consumer app/extension.
@@ -70,5 +73,17 @@ public class ConsumerController {
 
         ConsumerHistoryDetailResponse detail = consumerHistoryService.getHistoryDetail(sessionId);
         return ApiResponse.ok(detail, "Consumer history detail retrieved successfully");
+    }
+
+    /**
+     * Get capability matrix for a given client platform.
+     * GET /api/consumer/capabilities?platform=ANDROID
+     */
+    @GetMapping("/capabilities")
+    public ResponseEntity<ApiResponse<ConsumerCapabilitiesResponse>> getCapabilities(
+            @RequestParam(defaultValue = "ANDROID") String platform) {
+
+        ConsumerCapabilitiesResponse capabilities = consumerCapabilitiesService.getCapabilities(platform);
+        return ApiResponse.ok(capabilities, "Consumer capabilities retrieved successfully");
     }
 }

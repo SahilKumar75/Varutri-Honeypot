@@ -39,7 +39,7 @@ if [ -z "$TOKEN" ]; then
   exit 1
 fi
 
-curl -X POST http://localhost:8080/api/consumer/analyze \
+ANALYZE_RESPONSE=$(curl -s -X POST http://localhost:8080/api/consumer/analyze \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${TOKEN}" \
   -d '{
@@ -54,13 +54,37 @@ curl -X POST http://localhost:8080/api/consumer/analyze \
       "sourceApp": "messages",
       "locale": "en_IN"
     }
-  }'
+  }')
+
+echo "$ANALYZE_RESPONSE"
+echo -e "\n"
+
+SESSION_ID=$(echo "$ANALYZE_RESPONSE" | sed -n 's/.*"sessionId":"\([^"]*\)".*/\1/p')
+if [ -z "$SESSION_ID" ]; then
+  echo "[WARN] Could not parse sessionId from analyze response"
+fi
 echo -e "\n"
 
 # Test 4: Consumer History API
 echo "4. Testing consumer history endpoint..."
 curl -s "http://localhost:8080/api/consumer/history?limit=5" \
   -H "Authorization: Bearer ${TOKEN}"
+echo -e "\n"
+
+# Test 5: Consumer Capabilities API
+echo "5. Testing consumer capabilities endpoint..."
+curl -s "http://localhost:8080/api/consumer/capabilities?platform=ANDROID" \
+  -H "Authorization: Bearer ${TOKEN}"
+echo -e "\n"
+
+# Test 6: Consumer History Detail API
+echo "6. Testing consumer history detail endpoint..."
+if [ -n "$SESSION_ID" ]; then
+  curl -s "http://localhost:8080/api/consumer/history/${SESSION_ID}" \
+    -H "Authorization: Bearer ${TOKEN}"
+else
+  echo "[SKIP] sessionId unavailable"
+fi
 echo -e "\n"
 
 echo "Test complete!"
