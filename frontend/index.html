@@ -4,149 +4,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VARUTRI CONTROL INTERFACE</title>
+    <title>Varutri Consumer Command Center</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-    <div class="control-interface">
-        <!-- Top Header -->
-        <header class="top-header">
-            <div class="header-left">
-                <span class="logo">VARUTRI HONEYPOT SYSTEM</span>
+    <div class="ambient-layer"></div>
+    <div class="grain-layer"></div>
+
+    <div class="app-shell">
+        <header class="top-rail panel reveal-up">
+            <div>
+                <p class="eyebrow">Varutri Consumer Protection</p>
+                <h1>Scam Signal Operations Console</h1>
+                <p class="subtitle">End-to-end command surface for token auth, analysis, timeline review, and platform capabilities.</p>
             </div>
-            <div class="header-right">
-                <span class="timestamp" id="timestamp"></span>
+            <div class="status-cluster">
+                <div class="status-chip" id="presenceChip">Presence: IDLE</div>
+                <div class="status-chip subtle" id="tokenChip">Token: Not issued</div>
+                <div class="status-chip subtle mono" id="clockChip">--:--:--</div>
             </div>
         </header>
 
-        <!-- Main Content -->
-        <div class="main-content">
-            <!-- Sessions List View (Default) -->
-            <div class="sessions-view" id="sessionsView">
-                <!-- Active Sessions -->
-                <div class="sessions-section">
-                    <div class="section-header">
-                        <span>ACTIVE SESSIONS</span>
-                        <span class="session-count" id="activeCount">0</span>
-                    </div>
-                    <div class="sessions-list" id="activeSessions">
-                        <div class="empty-state">No active sessions</div>
-                    </div>
+        <main class="dashboard-grid">
+            <section class="panel connection-panel reveal-up delay-1">
+                <div class="section-head">
+                    <h2>1. Server Boundary</h2>
+                    <p>Connection and token lifecycle</p>
                 </div>
+                <form id="connectionForm" class="form-grid">
+                    <label>
+                        Base URL
+                        <input id="baseUrlInput" type="url" required>
+                    </label>
+                    <label>
+                        App ID
+                        <input id="appIdInput" type="text" required>
+                    </label>
+                    <label>
+                        Device ID
+                        <input id="deviceIdInput" type="text" required>
+                    </label>
+                    <label>
+                        App Version
+                        <input id="appVersionInput" type="text" required>
+                    </label>
+                    <label>
+                        Platform
+                        <select id="platformSelect">
+                            <option value="ANDROID">ANDROID</option>
+                            <option value="IOS">IOS</option>
+                            <option value="WEB">WEB</option>
+                            <option value="EXTENSION">EXTENSION</option>
+                        </select>
+                    </label>
+                    <div class="button-row">
+                        <button type="submit" class="btn primary" id="issueTokenBtn">Issue Token</button>
+                        <button type="button" class="btn soft" id="loadCapabilitiesBtn">Load Capabilities</button>
+                    </div>
+                </form>
+                <p class="meta-line">Token Expiry: <span id="tokenExpiryText">No token</span></p>
+            </section>
 
-                <!-- Recent Sessions -->
-                <div class="sessions-section">
-                    <div class="section-header">
-                        <span>RECENT SESSIONS</span>
-                        <span class="session-count" id="recentCount">0</span>
-                    </div>
-                    <div class="sessions-list" id="recentSessions">
-                        <div class="empty-state">No recent sessions</div>
-                    </div>
+            <section class="panel presence-panel reveal-up delay-2" id="presencePanel">
+                <div class="section-head">
+                    <h2>2. On-Screen Presence</h2>
+                    <p>Dynamic threat posture</p>
                 </div>
-            </div>
+                <p class="presence-title" id="presenceTitle">Idle Monitoring</p>
+                <p class="presence-note" id="presenceNote">Issue a token and run analysis to activate real-time posture guidance.</p>
+                <div class="latest-analysis" id="latestAnalysisSummary">No analysis yet.</div>
+            </section>
 
-            <!-- Conversation View (Hidden by default) -->
-            <div class="conversation-view hidden" id="conversationView">
-                <!-- Left Panel: Conversation -->
-                <div class="left-panel">
-                    <div class="panel-header">
-                        <button class="back-btn" onclick="showSessionsList()">← BACK TO SESSIONS</button>
-                        <div class="session-meta">
-                            <span id="currentSessionId">SESSION-001</span>
-                            <span class="separator">|</span>
-                            <span id="currentChannel">WHATSAPP</span>
-                        </div>
-                    </div>
-
-                    <!-- Conversation Feed -->
-                    <div class="conversation-feed" id="conversationFeed">
-                        <div class="system-msg">
-                            <span class="msg-timestamp">[SYSTEM]</span>
-                            <span class="msg-content">Select a session to view conversation</span>
-                        </div>
-                    </div>
+            <section class="panel analyze-panel reveal-up delay-3">
+                <div class="section-head">
+                    <h2>3. Analyze Signal</h2>
+                    <p>Capture suspicious content</p>
                 </div>
-
-                <!-- Right Panel: Intelligence -->
-                <div class="right-panel">
-                    <!-- AI Intervention Stats -->
-                    <div class="stats-section">
-                        <div class="section-header">AI INTERVENTION</div>
-                        <div class="stats-grid">
-                            <div class="stat-item">
-                                <div class="stat-label">TOTAL MESSAGES</div>
-                                <div class="stat-value" id="totalMessages">0</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">AI RESPONSES</div>
-                                <div class="stat-value" id="aiResponses">0</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">SCAMMER MSGS</div>
-                                <div class="stat-value" id="scammerMessages">0</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-label">DURATION</div>
-                                <div class="stat-value" id="sessionDuration">0m</div>
-                            </div>
-                        </div>
+                <form id="analyzeForm" class="form-grid">
+                    <label>
+                        Channel
+                        <select id="channelSelect">
+                            <option value="SMS">SMS</option>
+                            <option value="CALL">CALL</option>
+                            <option value="WHATSAPP">WHATSAPP</option>
+                            <option value="EMAIL">EMAIL</option>
+                            <option value="BROWSER">BROWSER</option>
+                            <option value="MANUAL">MANUAL</option>
+                            <option value="PROMPT">PROMPT</option>
+                        </select>
+                    </label>
+                    <label>
+                        Suspicious Content
+                        <textarea id="contentInput" rows="5" placeholder="Paste suspicious message, call transcript, email snippet, URL context, or prompt text."></textarea>
+                    </label>
+                    <label>
+                        Sender ID (optional)
+                        <input id="senderInput" type="text" placeholder="+9198xxxxxx / email / username">
+                    </label>
+                    <label>
+                        URL (optional)
+                        <input id="urlInput" type="url" placeholder="https://example-link">
+                    </label>
+                    <div class="button-row">
+                        <button type="submit" class="btn primary" id="analyzeBtn">Run Threat Analysis</button>
+                        <button type="button" class="btn soft" id="refreshHistoryBtn">Refresh Timeline</button>
                     </div>
-
-                    <!-- Threat Assessment -->
-                    <div class="threat-section">
-                        <div class="section-header">THREAT LEVEL</div>
-                        <div class="threat-display">
-                            <div class="threat-meter">
-                                <div class="threat-fill" id="threatFill"></div>
-                                <div class="threat-percentage" id="threatPercent">0%</div>
-                            </div>
-                            <div class="threat-classification" id="threatClass">SAFE</div>
-                        </div>
-                    </div>
-
-                    <!-- Scam Classification -->
-                    <div class="data-section">
-                        <div class="section-header">CLASSIFICATION</div>
-                        <div class="data-table">
-                            <div class="data-row">
-                                <span class="data-label">TYPE:</span>
-                                <span class="data-value" id="scamType">UNKNOWN</span>
-                            </div>
-                            <div class="data-row">
-                                <span class="data-label">CONFIDENCE:</span>
-                                <span class="data-value" id="confidence">N/A</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Intelligence Extracted -->
-                    <div class="intel-section">
-                        <div class="section-header">INTELLIGENCE EXTRACTED</div>
-                        <div class="intel-container" id="intelContainer">
-                            <div class="intel-empty">No intelligence gathered</div>
-                        </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="actions-section">
-                        <button class="action-btn" onclick="generateReport()">GENERATE REPORT</button>
-                        <button class="action-btn" onclick="runTests()">RUN DIAGNOSTICS</button>
-                    </div>
+                </form>
+                <div class="analysis-block" id="analysisBlock">
+                    <h3>Latest Analysis</h3>
+                    <div id="analysisContent">No analysis data yet.</div>
                 </div>
-            </div>
-        </div>
+            </section>
 
-        <!-- Bottom Status Bar -->
-        <footer class="status-bar">
-            <div class="status-left">
-                <span class="status-item">SYSTEM: <span class="status-online">ONLINE</span></span>
-                <span class="status-item">ENCRYPTION: <span class="status-online">ACTIVE</span></span>
-            </div>
-            <div class="status-right">
-                <span class="status-item">REPORTS GENERATED: <span id="totalReports">0</span></span>
-            </div>
+            <section class="panel history-panel reveal-up delay-4">
+                <div class="section-head">
+                    <h2>4. Evidence Timeline</h2>
+                    <p>Recent sessions and drill-down</p>
+                </div>
+                <div class="history-list" id="historyList">
+                    <div class="empty-state">No sessions loaded yet.</div>
+                </div>
+            </section>
+
+            <section class="panel capabilities-panel reveal-up delay-5">
+                <div class="section-head">
+                    <h2>5. Capability Matrix</h2>
+                    <p>Automation boundaries by platform</p>
+                </div>
+                <div id="capabilitiesSummary" class="capability-summary">No capability data yet.</div>
+                <div class="capability-list" id="capabilitiesList"></div>
+            </section>
+
+            <section class="panel detail-panel reveal-up delay-6">
+                <div class="section-head">
+                    <h2>6. Session Detail</h2>
+                    <p>Conversation and indicators</p>
+                </div>
+                <div id="detailContainer" class="detail-content">
+                    <div class="empty-state">Select a timeline session to inspect detail.</div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="bottom-rail panel reveal-up delay-6">
+            <span class="mono">Status: <strong id="statusText">Ready</strong></span>
+            <span class="mono" id="cacheStatus">Cache: idle</span>
         </footer>
     </div>
 
