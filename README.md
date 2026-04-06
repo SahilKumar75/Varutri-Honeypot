@@ -61,7 +61,54 @@ x-api-key: Your_api_key
 Content-Type: application/json
 ```
 
-### GET /health
+### POST /api/consumer/analyze
+
+Consumer-facing suspicious content analysis endpoint for mobile apps, browser extensions, and share flows.
+
+First get a consumer bearer token:
+
+```json
+POST /api/consumer/auth/token
+{
+	"appId": "varutri-mobile",
+	"deviceId": "device-abc-123",
+	"platform": "ANDROID",
+	"appVersion": "1.0.0"
+}
+```
+
+Then call consumer endpoints using:
+
+```
+Authorization: Bearer <accessToken>
+```
+
+Example request:
+```json
+{
+	"channel": "SMS",
+	"payload": {
+		"text": "You won 25 lakh. Send 5000 to claim now.",
+		"senderId": "+919876543210",
+		"url": "http://claim-prize-now.example"
+	},
+	"metadata": {
+		"platform": "ANDROID",
+		"sourceApp": "messages",
+		"locale": "en_IN"
+	}
+}
+```
+
+### GET /api/consumer/history
+
+List recent consumer analyses.
+
+### GET /api/consumer/history/{sessionId}
+
+Get detailed timeline and extracted indicators for one consumer session.
+
+### GET /api/health
 
 Health check endpoint
 

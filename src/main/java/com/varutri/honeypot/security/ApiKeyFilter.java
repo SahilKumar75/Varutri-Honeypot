@@ -19,7 +19,7 @@ import java.io.IOException;
  */
 @Slf4j
 @Component
-@Order(2) // Run after RateLimitFilter (which is Order 1)
+@Order(3) // Runs after consumer token filter
 public class ApiKeyFilter extends OncePerRequestFilter {
 
     @Value("${varutri.api-key}")
@@ -34,9 +34,10 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
         String requestApiKey = request.getHeader(API_KEY_HEADER);
 
-        // Allow health check endpoint without API key
-        if (request.getRequestURI().contains("/actuator") ||
-                request.getRequestURI().contains("/health")) {
+        String path = request.getRequestURI();
+
+        // Allow health and consumer endpoints without API key
+        if (isExemptPath(path)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -63,5 +64,11 @@ public class ApiKeyFilter extends OncePerRequestFilter {
 
         log.debug("API key validated successfully");
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isExemptPath(String path) {
+        return path.contains("/actuator")
+                || path.contains("/health")
+                || path.startsWith("/api/consumer");
     }
 }
