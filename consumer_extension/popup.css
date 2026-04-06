@@ -1,0 +1,130 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7f4;
+  --panel: #ffffff;
+  --text: #14322e;
+  --muted: #4b635f;
+  --line: #d0ddd8;
+  --primary: #0d9488;
+  --primary-strong: #0f766e;
+  --watch: #fef3c7;
+  --watch-text: #78350f;
+  --danger: #fee2e2;
+  --danger-text: #7f1d1d;
+  --safe: #dcfce7;
+  --safe-text: #14532d;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top right, #d9f4ef 0, #f5f7f4 60%);
+  color: var(--text);
+  font-family: "Segoe UI", "Avenir Next", "Gill Sans", sans-serif;
+}
+
+.panel {
+  width: 360px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 1.08rem;
+  letter-spacing: 0.02em;
+}
+
+.header p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.presence-label {
+  font-size: 0.74rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.presence-value {
+  margin-top: 2px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+h2 {
+  margin: 0 0 8px;
+  font-size: 0.88rem;
+}
+
+label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  font: inherit;
+  color: var(--text);
+}
+
+button {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  padding: 8px;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 7px;
+}
+
+button:last-child {
+  margin-bottom: 0;
+}
+
+button.primary {
+  background: linear-gradient(160deg, var(--primary), var(--primary-strong));
+  color: #f7fffd;
+}
+
+button.secondary {
+  background: #eef5f3;
+  color: #224a45;
+  border-color: #cdded9;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+pre {
+  margin: 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.74rem;
+  color: #264944;
+}

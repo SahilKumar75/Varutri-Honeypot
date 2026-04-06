@@ -61,6 +61,9 @@ curl -X POST http://localhost:8080/api/consumer/analyze \
 
 curl -X GET "http://localhost:8080/api/consumer/history?limit=10" \
   -H "Authorization: Bearer ${TOKEN}"
+
+curl -X GET "http://localhost:8080/api/consumer/capabilities?platform=ANDROID" \
+  -H "Authorization: Bearer ${TOKEN}"
 ```
 
 ## Configuration
@@ -85,3 +88,6 @@ Provide the ngrok HTTPS URL to GUVI platform.
 - API key authentication: Working
 - Hugging Face integration: Configured (may have rate limits/cold start delays)
 - All code pushed to: https://github.com/SahilKumar75/Varutri-Honeypot
+- Consumer app shell: `consumer_app/`
+- Browser extension shell: `consumer_extension/`
+- HLD/LLD + flow architecture doc: `CONSUMER_ARCHITECTURE.md`

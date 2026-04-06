@@ -30,6 +30,7 @@ public class ConsumerSignalService {
     private final SessionStore sessionStore;
     private final EvidenceCollector evidenceCollector;
     private final InputSanitizer inputSanitizer;
+    private final ConsumerCacheService consumerCacheService;
 
     public ConsumerAnalysisResponse analyzeSignal(ConsumerSignalRequest request) {
         String sessionId = resolveSessionId(request.getSessionId(), request.getChannel());
@@ -121,6 +122,7 @@ public class ConsumerSignalService {
             sessionStore.addMessage(sessionId, "user", analyzableText);
             sessionStore.addMessage(sessionId, "assistant", createSystemSummary(assessment));
             evidenceCollector.collectEvidence(sessionId, analyzableText, createSystemSummary(assessment));
+            consumerCacheService.invalidateHistory(sessionId);
         } catch (Exception ex) {
             log.warn("Failed to persist consumer analysis artifacts for {}: {}",
                     inputSanitizer.sanitizeForLogging(sessionId), ex.getMessage());

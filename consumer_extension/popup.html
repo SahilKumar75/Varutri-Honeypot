@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Varutri Scam Shield</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <section class="header">
+        <h1>Varutri Scam Shield</h1>
+        <p>Browser-first fraud triage flow</p>
+      </section>
+
+      <section class="card" id="presenceCard">
+        <div class="presence-label">Presence</div>
+        <div class="presence-value" id="presenceValue">IDLE</div>
+      </section>
+
+      <section class="card form-card">
+        <h2>Server Settings</h2>
+        <label>
+          Base URL
+          <input id="baseUrl" type="url" />
+        </label>
+        <label>
+          App ID
+          <input id="appId" type="text" />
+        </label>
+        <label>
+          Device ID
+          <input id="deviceId" type="text" />
+        </label>
+        <label>
+          App Version
+          <input id="appVersion" type="text" />
+        </label>
+        <button id="saveConfig" class="secondary">Save Config</button>
+      </section>
+
+      <section class="card actions-card">
+        <h2>Flow Actions</h2>
+        <button id="connectBtn" class="primary">1. Connect (Token)</button>
+        <button id="analyzeBtn" class="primary">2. Analyze Active Tab</button>
+        <button id="capabilitiesBtn" class="secondary">3. Load Capabilities</button>
+        <button id="historyBtn" class="secondary">4. Load History</button>
+      </section>
+
+      <section class="card" id="outputCard">
+        <h2>Output</h2>
+        <pre id="output">Ready</pre>
+      </section>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

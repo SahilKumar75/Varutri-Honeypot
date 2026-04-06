@@ -108,6 +108,10 @@ List recent consumer analyses.
 
 Get detailed timeline and extracted indicators for one consumer session.
 
+### GET /api/consumer/capabilities?platform=ANDROID
+
+Return platform-aware channel automation limits and recommended flows.
+
 ### GET /api/health
 
 Health check endpoint
@@ -122,6 +126,12 @@ Automatically detects:
 ### Cloud Deployment
 Deploy to AWS or Azure with $100 free credit:
 See [AZURE_QUICKSTART.md](AZURE_QUICKSTART.md) for details.
+
+## Consumer Clients
+
+- Flutter consumer shell: [consumer_app/README.md](consumer_app/README.md)
+- Browser extension shell: [consumer_extension/README.md](consumer_extension/README.md)
+- HLD/LLD and flow architecture: [CONSUMER_ARCHITECTURE.md](CONSUMER_ARCHITECTURE.md)
 
 #### Render
 Already configured - push to GitHub and connect Render.
