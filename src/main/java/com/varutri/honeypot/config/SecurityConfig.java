@@ -1,6 +1,7 @@
 package com.varutri.honeypot.config;
 
 import com.varutri.honeypot.security.ApiKeyFilter;
+import com.varutri.honeypot.security.ConsumerTokenFilter;
 import com.varutri.honeypot.security.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final ApiKeyFilter apiKeyFilter;
+    private final ConsumerTokenFilter consumerTokenFilter;
     private final RateLimitFilter rateLimitFilter;
 
     @Bean
@@ -38,8 +40,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
                 // Add rate limit filter first (blocks abusive requests early)
                 .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+                // Then consumer token filter for /api/consumer/**
+                .addFilterAfter(consumerTokenFilter, RateLimitFilter.class)
                 // Then API key filter (validates authentication)
-                .addFilterAfter(apiKeyFilter, RateLimitFilter.class);
+                .addFilterAfter(apiKeyFilter, ConsumerTokenFilter.class);
 
         return http.build();
     }

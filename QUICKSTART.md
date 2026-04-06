@@ -31,6 +31,38 @@ curl -X POST http://localhost:8080/api/chat \
   }'
 ```
 
+Consumer token + analysis endpoint example:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/consumer/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{
+    "appId": "varutri-mobile",
+    "deviceId": "android-test-device-001",
+    "platform": "ANDROID",
+    "appVersion": "1.0.0"
+  }' | sed -n 's/.*"accessToken":"\([^"]*\)".*/\1/p')
+
+curl -X POST http://localhost:8080/api/consumer/analyze \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -d '{
+    "channel": "WHATSAPP",
+    "payload": {
+      "text": "Urgent KYC update required, share OTP now",
+      "senderId": "+919000000001"
+    },
+    "metadata": {
+      "platform": "ANDROID",
+      "sourceApp": "whatsapp",
+      "locale": "en_IN"
+    }
+  }'
+
+curl -X GET "http://localhost:8080/api/consumer/history?limit=10" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
 ## Configuration
 
 Edit `src/main/resources/application.properties`:
